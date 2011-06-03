@@ -1,0 +1,28 @@
+<canvas debug="true">
+
+    <debug width="${parent.width}" height="${parent.height}"/>
+    
+    <!-- component hierarchies (ordered low-level to high-level)-->
+    <include href="../framework/utils.lzx"/>
+    <include href="../framework/traits.lzx"/>
+    
+    <handler name="oninit">
+        <![CDATA[
+            total_output = [];
+        
+            Debug.write("lz", lz);
+            output = [];
+            for(var key in lz)
+                output.push(key);
+               
+            output.sort();
+
+            for(var i = 0 ; i < output.length ; i ++)
+                total_output.push([output[i], lz[output[i]]]);
+            
+            for(var i = 0 ; i < total_output.length ; i ++)
+                Debug.write(i, ": ", total_output[i][0], " is ", total_output[i][1]);
+        ]]>
+    </handler>
+   
+</canvas>

@@ -1,0 +1,173 @@
+<library>
+    
+    <!-- this will always contain the list of applications available to the environment -->
+    <localset name="ApplicationRegistry">
+        <handler name="oninit">
+            var p = this.getPointer();
+            p.addNode('applications');
+            p.addNode('running');
+        </handler>
+    </localset>
+    
+    <!-- This uses the dataset above to store registered applications. Listening lists
+         and other objects can paint and use this information -->
+    <class name="application" extends="node">
+    	<attribute name="width" type="string" value="500"/>	
+        <attribute name="height" type="string" value="300"/>	
+        <attribute name="named" type="string"/>
+        <attribute name="icon" type="string" value="generic_application_icon"/>
+        <attribute name="type" type="string"/>
+        <attribute name="using" type="string"/>
+        
+        <handler name="oninit">
+            <![CDATA[
+                //Update and tell all listeners that the ApplicationRegistry has been added to
+                //make an object corresponding to an application tag
+                var appdp = canvas.datasets.ApplicationRegistry.getPointer();
+                appdp.setXPath('applications');
+                
+                appdp.addNode('application', '', {named:this['named'], 
+                								  using:this['using'], 
+                                                  icon:this['icon'], 
+                                                  width:this['width'],
+                                                  height:this['height']});
+                                                  
+                Utils.now(canvas.datasets.ApplicationRegistry, true);
+                
+                //if they specify a type use that to setup an automatic dropzone type
+                if(this['type'] && !DropManager['dropzones'][this.type])
+                    DropManager['dropzones'][this.type] = [];
+                    
+                Debug.write("registered application: ", this.named, canvas.datasets.ApplicationRegistry);
+            ]]>
+        </handler>
+    </class>
+    
+    <!-- this class takes a class name in the using attribute to 
+         make a window that encapulates and manages the visibilty
+         and longevity of the managed class. The class does not
+         need to be aware of the window unless it wants to be. -->
+    <class name="ApplicationWindow" extends="dynamicSizedPane"
+    		width="500" 
+            height="300"
+            innercolor="0xe5e5e5"
+            skin="{ul:'windowpane_osx_ul',
+                   ur:'windowpane_osx_ur',
+                   ll:'windowpane_osx_c',
+                   lr:'windowpane_osx_c', 
+                   t:'windowpane_osx_uc',
+                   r:'windowpane_osx_c',
+                   b:'windowpane_osx_c',
+                   l:'windowpane_osx_c'}">
+                   
+        <attribute name="label" type="string" value="${this.bind.getNodeAttribute('named')}"/>
+        <attribute name="using" type="string" value="${this.bind.getNodeAttribute('using')}"/>
+        <attribute name="icon" type="string" value="${this.bind.getNodeAttribute('icon')}"/>
+        <attribute name="appid" type="expression" value="${this.bind.getNodeAttribute('appid')}"/>
+        <attribute name="maximized" type="boolean" value="false"/>
+        
+        <!-- look at all the traits lining up! nice.. -->
+        <shadowed/>
+        <multiclickable/>
+        <moveable enabled="${!classroot.maximized}"/>
+        <resizeable handle="$once{classroot.handle}" minwidth="250" minheight="100" enabled="${!classroot.maximized}"/>
+        <waypoint/>
+        
+        <handler name="oninit">
+        	Debug.write('AppWindow: this.width, this.height', this.width, this.height);	
+            Utils.create(this.using, this.content, {});
+        </handler>
+        
+        <handler name="onremoved">
+            this.boundlist.remove(this);
+        </handler>
+
+        <handler name="onmousedown">
+            Utils.bringToFront(this);
+        </handler>
+        
+        <method name="close" args="ignore">
+            //invoke remove on the inner object when the window is destroyed                    
+            this.content.subviews[0].setAttribute('removed', true);
+            this.setAttribute('removed', true);
+            this.destroy();
+        </method>
+        
+        <!-- application icon -->
+        <view resource="${classroot.bind.getNodeAttribute('icon')}" 
+               x="3" y="3" width="15" height="15" stretches="both"/>
+        
+        <!-- window label -->
+        <text y="2" align="center" text="${classroot.label}"/>
+        
+        <!-- window management buttons -->
+        <view x="${parent.width-this.width-7}" y="2" height="${parent.height}">
+            <horizontal spacing="3"/>
+            
+            <view resource="hide_icon">
+                <handler name="onmousedown">
+                    Debug.write("hide!");
+                </handler>
+            </view>
+            
+            <view resource="maximize_icon">
+                <handler name="onmousedown">
+                    if(!classroot['maximized']){
+                        classroot.maximized = {x:classroot.x, y:classroot.y, w:classroot.width, h:classroot.height};
+                        classroot.setAttribute('x', 0);
+                        classroot.setAttribute('y', 0);
+                        classroot.setAttribute('width', classroot.parent.width);
+                        classroot.setAttribute('height',classroot.parent.height);
+                    }else{
+                        classroot.setAttribute('x', classroot.maximized['x']);
+                        classroot.setAttribute('y', classroot.maximized['y']);
+                        classroot.setAttribute('width', classroot.maximized['w']);
+                        classroot.setAttribute('height',classroot.maximized['h']);
+                        classroot.maximized = false;
+                    }
+                </handler>
+                
+                <!-- use THIS as an example of why laszlo needs a new constraint type, if not gaining implicit events system wide -->
+                <view visible="false" resource="maximize_on"/>
+            </view>
+            
+            <view resource="close_icon">
+                <handler name="onmousedown">
+                    classroot.close(true);
+                </handler>
+            </view>
+        </view>
+       
+        <!-- 'using' container view -->
+        <view name="content" x="3" y="22" width="${classroot.width-6}" height="${classroot.height-24}"  clip="true"/>
+        
+        <!-- resize handle -->
+        <view name="handle" resource="windowpane_osx_lrr" x="${parent.width-this.width}" y="${parent.height-this.height}" clickable="true"/>
+        
+        <!-- eventless overlay to indicate selection -->
+        <view clickable="false" bgcolor="yellow" opacity="0.3" visible="false" width="${parent.width}" height="${parent.height}">
+            <handler name="onselected" reference="parent">
+                this.setAttribute('visible', parent['selected']);
+            </handler>
+        </view>
+        
+        <view name="focus_layer" clickable="false" width="100%" height="100%">
+        	
+            <handler name="onsingleclick">
+            	Debug.write('focus_layer clicked on', classroot);	
+            </handler>	
+        </view>
+    </class>
+
+    <!-- a view that represents one application in the ApplicationList -->
+    <class name="minimizedApplicationWindow" resource="${this.bind.getNodeAttribute('icon')}">
+        <multiclickable/>
+        <handler name="onsingleclick">
+            <![CDATA[
+                var appid = this.bind.getNodeAttribute('appid');
+                Utils.bringToFront(canvas._.apps.getAppFromId(appid));
+            ]]>
+        </handler>
+    </class>
+    
+</library>

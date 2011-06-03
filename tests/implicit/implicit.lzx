@@ -1,0 +1,20 @@
+<canvas debug="true">
+    
+    <class name="implicitThing">
+    	<attribute name="flag" type="boolean" value="false"/>	
+        
+        <handler name="onflag">
+        	Debug.write('Flag changed on', this);	
+        </handler>	
+    </class>
+    
+    <handler name="oninit">
+    	Debug.write('Setting first to true');
+        canvas.first.setAttribute('flag', true);
+    </handler>	
+    
+    <implicitThing name="first"/>
+    <implicitThing name="second" flag="${canvas.first.flag}"/>
+    <implicitThing name="third" flag="${canvas.second.flag}"/>
+    
+</canvas>

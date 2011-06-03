@@ -1,0 +1,63 @@
+<library>
+    
+    <locallistset name="ApplicationRegistry">
+        <handler name="oninit">
+            var p = this.getPointer();
+            p.addNode('applications');
+            p.addNode('running');
+        </handler>
+    </locallistset>
+    
+    <!-- This uses the dataset above to store registered applications. Listening lists
+         and other objects can paint and use this information-->
+    <class name="application">
+        <attribute name="named" type="string"/>
+        <attribute name="icon" type="string" value="generic_application_icon"/>
+        <attribute name="type" type="string"/>
+        <attribute name="using" type="string"/>
+        
+        <handler name="oninit">
+            <![CDATA[
+                //Update and tell all listeners that the ApplicationRegistry has been added to
+                //make an object corresponding to an application tag
+                var appdp = canvas.datasets.ApplicationRegistry.getPointer();
+                appdp.setXPath('applications');
+                
+                appdp.addNode('application', '', {named:this['named'], using:this['using'], icon:this['icon']});
+                Utils.now(canvas.datasets.ApplicationRegistry, true);
+                
+                //if they specify a type use that to setup an automatic dropzone type
+                if(this['type'] && !DropManager['dropzones'][this.type])
+                    DropManager['dropzones'][this.type] = [];
+                    
+                Debug.write("registered application: ", this.named, canvas.datasets.ApplicationRegistry);
+            ]]>
+        </handler>
+    </class>
+    
+    <!-- meant to work with a list to manage open applications -->
+    <class name="ApplicationWindow" extends="windowpane" 
+            using="${this.bind.getNodeAttribute('using')}"
+            label="${this.bind.getNodeAttribute('named')}"
+            icon="${this.bind.getNodeAttribute('icon')}"
+            width="500" height="300">
+            
+        <attribute name="appid" type="expression" value="${this.bind.getNodeAttribute('appid')}"/>
+        
+        <handler name="onremoved">
+            this.boundlist.remove(this);
+        </handler>
+
+    </class>
+
+    <class name="minimizedApplicationWindow" resource="${this.bind.getNodeAttribute('icon')}">
+        <multiclickable/>
+        <handler name="onsingleclick">
+            <![CDATA[
+                var appid = this.bind.getNodeAttribute('appid');
+                Utils.bringToFront(canvas._.apps.getAppFromId(appid));
+            ]]>
+        </handler>
+    </class>
+    
+</library>

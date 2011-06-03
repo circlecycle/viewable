@@ -1,0 +1,27 @@
+<canvas debug="true">
+    <simplelayout axis="y" spacing="10"/>
+
+    <view name="one" width="10" height="10" bgcolor="red"/>
+    <view name="two" width="10" height="10" bgcolor="blue"/>
+    <view name="three" width="10" height="10" bgcolor="green"/>
+    
+    <button text="create four">
+        <handler name="onclick">
+            creator.create('view', canvas, {width:10, height:10, bgcolor:'red'});
+        </handler>
+    </button>
+    
+    <button text="remove four">
+        <handler name="onclick">
+            Debug.write("canvas.subviews[6]", canvas.subviews[6]);
+            canvas.subviews[6].destroy();
+        </handler>
+    </button>
+    
+    <node id="creator">
+        <method name="create" args="cname, where, params">
+            var obj = new lz[cname](where, params);
+            return obj;
+        </method>
+    </node>
+</canvas>

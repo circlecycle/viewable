@@ -1,0 +1,154 @@
+<library>
+
+    <!-- everything above the split are normal builtin layouts or their abbr. -->
+    
+    
+    <!-- synonym for simplelayout axis = y -->
+    <class name="vertical" extends="simplelayout" axis="y"/>
+    
+    <!-- synonym for simplelayout axis = x -->
+    <class name="horizontal" extends="simplelayout" axis="x"/>a
+    
+
+    <!-- **************************************************************88 -->
+    <!-- **************************************************************88 -->
+    <!-- **************************************************************88 -->
+
+    <!-- everything below this point are layouts designed to work with 
+         the Viewable replication system    -->
+    
+    <!-- conveinence class because i want to use camel case throughout the class names where possible (as a general Good Idea) -->
+    <!-- same thing as simple layout -->
+    <class name="simpleLayout" extends="node" with="chainable" after="$once{true}">
+        <attribute name="spacing" type="number" value="0"/>
+        <attribute name="force" type="expression" value="false"/>
+        <attribute name="axis" type="string" value="x"/>
+        <attribute name="attr" type="string"/>
+        <attribute name="attrLookup" type="expression" value="$once{{x:'width', y:'height'}}"/>
+
+        <handler name="onfinished">
+            this.update(true);
+        </handler>
+        
+        <method name="update" args="ignore">
+            <![CDATA[
+                //  if no subviews on the parent then there is nothing to do
+                if(parent.subviews.length == 0) return;
+                var currentSpacing = 0;
+                var dim = this.attrLookup[this.axis];
+                
+                //loop through all of the children (if they exists) decrementing the space
+                //and applying that to the axis (x/y) position as we go!
+                for(var i = 0 ; i < parent.subviews.length ; i++){
+                    var child = parent.subviews[i];
+                    
+                    if(child == undefined || child['options']['ignorelayout'] || !child['visible'])
+                        continue;
+                        
+                    //okay set the attribute, prepare the next iteration    
+                    child.setAttribute(this.axis, currentSpacing);
+                    currentSpacing = currentSpacing + parseInt(child[dim]) + this.spacing;
+                }
+            ]]>
+        </method>
+    </class>
+    
+    <!-- same thing as simple layout from the right side going backwards -->
+    <class name="simpleReverseLayout" extends="node" with="chainable" after="$once{true}">
+        <attribute name="spacing" type="number" value="0"/>
+        <attribute name="force" type="expression" value="false"/>
+        <attribute name="axis" type="string" value="x"/>
+        <attribute name="attr" type="string"/>
+        <attribute name="attrLookup" type="expression" value="$once{{x:'width', y:'height'}}"/>        
+
+        <handler name="onfinished">
+            this.update(true);
+        </handler>
+        
+        <method name="update" args="ignore">
+            <![CDATA[
+                //if no subviews on the parent then there is nothing to do
+                if(parent.subviews.length == 0) return;
+                var dim = this.attrLookup[this.axis];
+                
+                //set the first element to zero and prepare the first decrement
+                parent.subviews[0].setAttribute(this.axis, parent.width-parent.subviews[0].width);
+                var currentSpacing = parent[dim]-parent.subviews[0][dim];
+            
+                //loop through all of the children (if they exists) decrementing the space
+                //and applying that to the axis (x/y) position as we go!
+                for(var i = 1 ; i < parent.subviews.length ; i++){
+                    var child = parent.subviews[i];
+                    if(child == undefined || child['options']['ignorelayout'] || !child['visible'])
+                        continue;
+                    
+                    currentSpacing = currentSpacing - child[dim] - this.spacing;
+                    child.setAttribute(this.axis, currentSpacing);
+                }
+            ]]>
+        </method>
+    </class>
+    
+    <class name="evenLayout" extends="node" with="chainable" after="$once{true}">
+        <attribute name="spacing" type="number" value="0"/>
+        <attribute name="axis" type="string" value="x"/>
+        
+        <handler name="onfinished">
+            this.update(true);
+        </handler>
+        
+        <method name="update" args="ignore">
+            <![CDATA[
+                //if no subviews on the parent then there is nothing to do
+                if(parent.subviews.length == 0) return;
+            
+                //loop through all of the children (if they exist) incrementing the space
+                //and applying that to the x position as we go.
+                for(var i = 0 ; i < parent.subviews.length ; i++){
+                    var child = parent.subviews[i];
+                    
+                    if(child == undefined)
+                        continue;
+                        
+                    if(child['options']['ignorelayout'] || !child['visible'])
+                        continue;
+                        
+                    child.setAttribute(this.axis, i*this.spacing);
+                }
+            ]]>
+        </method>
+    </class>
+    
+    <!-- lay out sibling views from upper left to lower right.-->
+    <class name="diagonalEvenLayout" extends="node" with="chainable" after="$once{true}">
+        <attribute name="spacing" type="number" value="0"/>
+        <attribute name="axis" type="string" value="x"/>      
+        <handler name="onfinished">
+            this.update(true);
+        </handler>
+        
+        <method name="update" args="ignore">
+            <![CDATA[
+                //if no subviews on the parent then there is nothing to do
+                if(parent.subviews.length == 0) return;
+            
+                //set the first element to zero and prepare the first increment
+                parent.subviews[0].setAttribute('x', 0);
+                parent.subviews[0].setAttribute('y', 0);
+                var currentSpacing = this.spacing;
+
+                //loop through all of the children (if they exist) incrementing the space
+                //and applying that to the x position as we go.
+                for(var i = 1 ; i < parent.subviews.length ; i++){
+                    var child = parent.subviews[i];
+                    if(child == undefined || child['options']['ignorelayout'] || !child['visible'])
+                        continue;
+                        
+                    child.setAttribute('x', currentSpacing);
+                    child.setAttribute('y', currentSpacing);
+                    currentSpacing = currentSpacing + this.spacing;
+                }
+            ]]>
+        </method>
+    </class>
+</library>

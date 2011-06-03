@@ -1,0 +1,133 @@
+<canvas>
+    <!-- A very useful namespace mechanism. The waypoint class allows for "deep" navigation 
+         of nested namespaces by causing an entry specified by the "named" attribute 
+         to be added to the "parent waypoint" of the this one using that name. A parent waypoint 
+         is either the canvas, a node with an ID, or another waypoint anointed node
+         
+         Example:
+         
+         <class name="foo">
+            <waypoint/>
+            
+            <handler name="oninit">
+                Debug.write("this._.one", this._.one);
+            </handler>
+            
+            <view>
+                <view>
+                    <view>
+                        <waypoint named="one"/>
+                    </view>
+                </view>
+            </view>
+         </class>
+         
+    -->
+     
+    <class name="waypoint" extends="node" initstage="early">
+        <!-- if this attribute is specified, then a waypoint by this name will be added to the waypoint parent -->
+        <attribute name="named" type="string"/>
+
+        <!-- at construct time, determine the waypoint parent and add references, as/if needed -->
+        <method name="construct" args="p, a">
+            <![CDATA[
+                super.construct(p, a);
+                
+                //retrieve values from the tag
+                var named = a['named'];
+                var np = p.parent;
+                
+                //is this object already a way point? do no more.
+                if(!p['_'])
+                    p['_'] = new Object;
+                else    
+                    return;                   
+
+                //we need do no more for the canvas element
+                if(p == canvas)
+                    return;
+                    
+                //find out which node will receive the new waypoint
+                while(1){
+                    
+                    //have we found a potential parent waypoint? We either find it above or use the topmost node.
+                    if((np['_'] || np['id'] || np.nodeLevel == 0)){
+                    
+                        //initialize space ('_') to hold waypoints if this is a new waypoint parent.
+                        if(np['_'] == undefined) np._ = {};
+
+                        //if no name given make a name based on the number of other nameless waypoints
+                        //otherwise ensure the name doesn't overwrite anything in the target waypoint space.
+                        if(!named){
+ 
+                            // if __waypointCount is not defined initialize it to zero, otherwise increment
+                            np.__waypointcount = np['__waypointcount'] != undefined ? np.__waypointcount + 1 : 0;                                               
+
+                            // and use value that to generate a unique name
+                            named = "unnammed_waypoint"+np.__waypointcount;
+                            
+                        }else if(np._[named] != undefined){
+                            Debug.warn('waypoint overwritten:', np, 'name', named);
+                        }
+
+                        //Add this node to a waypoint parent, add the waypoint to this node ("parent"), then break
+                        np._[named] = p;
+                        
+                        //record the parent waypoint to this tag
+                        p._.parent = np;
+                        break;
+                    }
+
+                    //...or just keep looking up the tree until we find a good target.
+                    np = np.parent;
+                }
+                
+                //we don't need the this anymore, it's done it's job (cyclic GC? investigate)
+            ]]>
+        </method>
+    </class>
+    
+    <simplelayout axis="x" spacing="10"/>
+
+    <!-- note that the oninit handler in both of these top level views
+         (examples one and two below) need not change, regardless of how
+         deep the nesting inside goes, without using any ids that would
+         otherwise pollute our tidy namespace, and also promotes reusable
+         (read copy/pasteable) code. voila!
+    -->
+    
+    <!-- example one -->
+    <view>
+        <waypoint/>
+        
+        <handler name="oninit">
+            Debug.write("this._.field", this._.field);
+        </handler>
+        
+        <view bgcolor="yellow" width="300" height="300">
+            <edittext align="center" valign="middle" text="My Field">
+                <waypoint named="field"/>
+            </edittext>
+        </view>
+    </view>
+    
+    <!-- example two -->
+    <view>
+        <waypoint/>
+        
+        <handler name="oninit">
+            Debug.write("this._.field", this._.field);
+        </handler>
+        
+        <view bgcolor="yellow" width="300" height="300">
+            <view bgcolor="red" width="200" height="200" align="center" valign="middle">
+                <view bgcolor="blue" width="150" height="150" align="center" valign="middle">
+                    <edittext align="center" valign="middle" text="My Field">
+                        <waypoint named="field"/>
+                    </edittext>
+                </view>
+            </view>
+        </view>
+    </view>
+    
+</canvas>

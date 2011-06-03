@@ -1,0 +1,10 @@
+<canvas debug="true">
+    
+    <dataset name="strings">
+    	<submit>submittosio</submit>
+        <reset>resettosio</reset>
+    </dataset>
+    
+    <button datapath="strings:/submit" text="$path{'text()'}"/>
+    
+</canvas>

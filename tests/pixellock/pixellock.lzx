@@ -1,0 +1,98 @@
+<canvas width="100%" height="100%" bgcolor="black">
+	<!-- PIXELLOCK Test, meant to show how pixellock alters layouts in strange ways;
+		 when this is run and the window is resized, watch the button noticing that
+		 depending on how the canvas is sized you will see a defect - a single vertical line
+         on the button - even though the buttons width (and child widths!) are constant. Help!
+    -->	
+
+	<!--  tested with the url (under laszlo 4.6.1):
+		  http://127.0.0.1/lps-4.6.1/viewablegroup/tests/pixellock/pixellock.lzx?lzr=swf9
+    -->	
+
+	<!-- resources for buttons - use for all three states (normal, down, selected) which will illustrate the problem fine. -->	
+	<resource name="r" src="r.png"/>
+    <resource name="l" src="l.png"/>
+    <resource name="c" src="c.png"/>
+    
+    <!--  create a test-class that, given resources in a passed-in skin dictionary, will make a button.
+		  see the one instance of it below to see the reduced complexity of invocation -->	
+    <class name="dynamicSizedButton" height="${this.normal.left.resourceheight}" width="80">
+        <attribute name="label" type="string" value="No Label"/>
+        <attribute name="selected" type="boolean" value="false"/>
+        <attribute name="enabled" type="boolean" value="true"/>
+        <attribute name="skin" type="expression" value="$once{{}}"/>
+        
+        <!-- skin the widget with the passed in set of resource names -->
+        <handler name="oninit">
+            this.applySkin(true);
+            //have to call this on update to ensure that user state is properly applied (sigh)
+            this.setAttribute('enabled', this['enabled']);
+        </handler>        
+        
+        <!-- set the resources of this widget to the ones in specfied in the "skin" attribute dictionary. -->
+        <method name="applySkin" args="ignore">
+            this.normal.left.setAttribute('resource', this.skin['l']);
+            this.normal.right.setAttribute('resource', this.skin['r']);
+            this.normal.center.setAttribute('resource', this.skin['c']);
+            
+            if(this.skin['sl']){
+                this.selectedimg.left.setAttribute('resource', this.skin['sl']);
+                this.selectedimg.right.setAttribute('resource', this.skin['sr']);
+                this.selectedimg.center.setAttribute('resource', this.skin['sc']);
+            }
+            
+            if(this.skin['dl']){
+                this.down.left.setAttribute('resource', this.skin['dl']);
+                this.down.right.setAttribute('resource', this.skin['dr']);
+                this.down.center.setAttribute('resource', this.skin['dc']);
+            }
+            
+        </method>
+        
+        <!-- what the button looks like normally -->
+        <view name="normal" clickable="false">
+        	<stableborderlayout axis="x" spacing="${parent.left.resourcewidth"/>
+            <view name="left"/>
+            <view name="center" stretches="width"/>
+            <view name="right"/>
+        </view>
+        
+        <!-- what the button looks like on mouseover -->
+        <view name="selectedimg" opacity="0" clickable="false">
+        	<stableborderlayout axis="x" spacing="${parent.left.resourcewidth"/>
+            <view name="left"/>
+            <view name="center" stretches="width"/>
+            <view name="right"/>
+        </view>
+        
+        <!-- what the button looks like on mouseover -->
+        <view name="down" opacity="0" clickable="false">
+        	<stableborderlayout axis="x" spacing="${parent.left.resourcewidth"/>
+            <view name="left"/>
+            <view name="center" stretches="width"/>
+            <view name="right"/>
+        </view>
+        
+        <!-- the label -->
+        <text fgcolor="black" name="field" resize="true" text="${classroot.label}" align="center" valign="middle"/>
+    </class>
+    
+    <!-- now make a mybutton class, skinned, ad ready to use -->	
+    <class name="mybutton" extends="dynamicSizedButton" 
+    	   width="200"
+    	   label="weird lines"
+           skin="{r:'r',
+                  l:'l',
+                  c:'c', 
+                  dr:'r',
+                  dl:'l',
+                  dc:'c', 
+                  sr:'r',
+                  sl:'l',
+                  sc:'c'}"/>
+                   
+    <!-- make a single button instace in the middle of the screen showing the defect in question.
+	     BE SURE TO RESIZE THE WINDOW TO SEE THE DEFECT IN ACTION! -->	
+    <mybutton align="center" valign="middle"/>
+    
+</canvas>

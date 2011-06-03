@@ -1,0 +1,124 @@
+<library>
+    
+    <!-- a scroll bar, now with a tiny touch of smooth scrolling ahahahaha. -->
+    <class name="smoothScroll" extends="scrolly">
+        <attribute name="delta_sum" type="number" value="0"/>
+        <attribute name="delta_num" type="number" value="1"/>
+        
+        <fireLateEvent/>
+        
+        <handler name="onlate">
+            //setup the handlers on the scrolltarget
+            var isVisible_method = new lz.Delegate(this, 'isVisible');
+            //slave to the scroll targets height
+            isVisible_method.register(this.scrolltarget, "onheight");
+            isVisible_method.register(this, "onheight");
+        
+            //NOTE: we theme the resources of the scroll to an aqua one in this fashion
+            //so we don't have to change the components codebase.
+
+            //this makes the top a black line like the bottom
+            this.scrolltrack.thumb.subviews[0].setAttribute('resource', this.scrolltrack.thumb.subviews[2].resource);
+            //this makes the underlying image of the thumb aquaey
+            this.scrolltrack.thumb.subviews[1].setAttribute('resource', "aqua_scroll_solid");
+            //this makes the grabber thing less noticeable
+            this.scrolltrack.thumb.subviews[3].setAttribute('opacity', 0.4);
+
+            //NOTE: we have to setup a listener for the mouse events by hand! reference doesn't work
+
+            //set the mousedown handler on the scroll thumb
+            this.monitorSmoothScroll_method = new lz.Delegate(this, 'monitorSmoothScroll');
+            this.monitorSmoothScroll_method.register(this.thumb, 'onmousedown');
+
+            //set the mouseup handler on the scroll thumb
+            this.executeSmoothScroll_method = new lz.Delegate(this, 'executeSmoothScroll');
+            this.executeSmoothScroll_method.register(this.thumb, 'onmouseup');
+
+            //save two delegates we will use to turn on and off delta chceking binding drag
+            this.getDelta_method = new lz.Delegate(this, 'getDelta');
+            this.refresh(true);
+        </handler>
+        
+        
+        <!-- called when the scroll target's height changes, as setup in the late handler -->
+        <method name="isVisible" args="ignore">
+            <![CDATA[
+                //if we don't need to show ourselves, vanish or vice versa.
+                this.setAttribute('visible', parent.height < this.scrolltarget.height-5);
+            ]]>
+        </method>
+        
+        <!-- cause sizes to refresh, manually, as is done with the "when" clauses -->
+        <method name="refresh" args="ignore">
+            this.scrolltarget.onheight.sendEvent();
+        </method>
+    
+        <!-- setup the state needed to monitor the average speed of the scrollbar -->
+        <method name="monitorSmoothScroll" args="what">
+            //reset the parameters and start the onidle event firing
+            this.lasty = this.scrolltarget.y;
+            this.delta_sum = 0;
+            this.delta_num = 1;
+            this.idlecount = 0;
+            lz.Timer.addTimer(this.getDelta_method, 100);
+            //this.getDelta_method.register(lz.Idle, 'onidle');
+        </method>
+        
+        <!-- suring each timer check, average the speed -->
+        <method name="getDelta" args="what">
+            //compute the delta of the thumb binding on idle, using the average total movement
+            this.delta_sum =+ this.scrolltarget.y - this.lasty;
+            
+            this.delta_num += 1;
+            this.lasty = this.scrolltarget.y;
+            
+            //reset the timer to calculate delta of scrollbar movement
+            lz.Timer.resetTimer(this.getDelta_method, 100);
+        </method>
+        
+        <!-- when the mouse is let up use the average speed to animate the scrollbar the rest of the way.. viola! -->
+        <method name="executeSmoothScroll" args="what">
+            <![CDATA[
+                //stop the timer event
+                lz.Timer.removeTimer(this.getDelta_method);
+                
+                //if it is not enabled then bounce
+                if(!Utils.enable_animations) return;
+                
+                //find the actual delta binding the scroll
+                var delta = this.delta_sum / this.delta_num;
+                
+                //dont animate if it's not big enough of a change
+                if(Math.abs(delta) <= 1) return;
+                
+                //how much to move? the scaling value at the end is up to the programmer for feeling
+                var amt_to_move = ((delta/this.scrollmax)*this.height)*50;
+                
+                //finally, if they are above or below the limits of the scroll bar force those limits
+                //or perform the animation (using the 'this.delta' attribute) to cause the thumb
+                //to move a dependent amount.
+                var abs_amt_to_move = this.scrolltarget.y + amt_to_move;
+                var top = 0;
+                var bottom = -this.scrolltarget.height + parent.height; 
+                
+                //top bounds
+                if(abs_amt_to_move >= top){
+                    this.scrolltarget.setAttribute('y', parent.height/2);
+                    Utils.tween(this.scrolltarget, 'y', top, 1000, {motion:'easeout'});
+                }
+                    
+                    
+                //bottom bounds
+                else if(abs_amt_to_move <= bottom){
+                    this.scrolltarget.setAttribute('y', bottom-(parent.height/2));
+                    Utils.tween(this.scrolltarget, 'y', bottom, 1000, {motion:'easeout'});
+                }
+                    
+                //animate it
+                else
+                    Utils.tween(this.scrolltarget, 'y', abs_amt_to_move, 1000, {motion:'easeout'});
+            ]]>
+        </method>
+    </class>
+    
+</library>

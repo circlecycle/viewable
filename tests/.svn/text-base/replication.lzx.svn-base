@@ -1,0 +1,158 @@
+<canvas debug="true" bgcolor="0x999999">
+    <!-- component hierarchies (ordered low-level to high-level)-->
+    <include href="../framework/resources.lzx"/>
+    <include href="../framework/utils.lzx"/>  
+    <include href="../framework/traits.lzx"/>
+    <include href="../framework/layouts.lzx"/>
+    <include href="../framework/list.lzx"/>
+    <include href="../framework/ui.lzx"/>
+    <include href="../framework/smoothscroll.lzx"/>
+    
+    <debug y="600"/>
+    
+    <!-- this dataset represents "PeopleItems", a collection of people that this application 
+         will manipulate. This would, in production, be loaded from a server resource.  -->
+         
+    <listset name="someset" src="http://127.0.0.1:8080/lps-4.6.1/viewablegroup/tests/people.xml" request="true">
+        <handler name="ondata">
+            Debug.write("data received");
+        </handler>
+    </listset>
+    
+    <!-- MyApp Class: instantiate an instance of this appliction ######################### -->
+    
+    <!-- Define a class that wraps our application -->
+    <class name="MyApp" bgcolor="0xddddee" width="400" height="500">
+        <waypoint/>
+        
+        <vertical/>
+        
+        <!-- buttons to print xml and copy selected -->
+        <horiz>
+            <!-- when this button is clicked remember to commit then show our xml in the debugger -->
+            <aquaButton label="print xml">
+                <handler name="onsingleclick">
+                    ListManager.commit(true);
+                    Debug.write(canvas.datasets.someset.getPointer().serialize());
+                </handler>
+            </aquaButton>
+            
+            <aquaButton label="copy">
+                <handler name="onsingleclick">
+                    <![CDATA[
+                        var views = classroot._.content.subviews;
+                        var to_append = [];
+                        
+                        for(var i = 0 ; i < views.length ; i ++){
+                            if(views[i]._.selected.value){
+                               //unselect the object
+                               views[i]._.selected.setAttribute('value', false);
+                               to_append.push(views[i].bind);
+                            }
+                        }
+                        
+                        classroot._.content._.list.append(to_append);
+                    ]]>
+                </handler>
+            </aquaButton>
+            
+            <aquaButton label="Select All">
+                <handler name="onsingleclick">
+                    <![CDATA[
+                        var views = classroot._.content.subviews;
+                        
+                        for(var i = 0 ; i < views.length ; i ++)
+                            views[i]._.selected.setAttribute('value', true);
+                    ]]>
+                </handler>
+            </aquaButton>
+            
+            <aquaButton label="Unselect All">
+                <handler name="onsingleclick">
+                    <![CDATA[
+                        var views = classroot._.content.subviews;
+                        
+                        for(var i = 0 ; i < views.length ; i ++)
+                            views[i]._.selected.setAttribute('value', false);
+                    ]]>
+                </handler>
+            </aquaButton>
+        </horiz>
+        
+        <!-- our application header -->
+        <horiz bgcolor="0xccccee" width="${parent.width}">
+            <text width="100" text="Selected"/>
+            <text width="100" text="First Name"/>
+            <text width="100" text="Last Name"/>
+        </horiz>
+        
+        <!-- the main list for the list items to manipulate -->
+        <view width="${parent.width}" height="200" clip="true">
+        
+            <!-- our application entries -->
+            <view width="${parent.width-parent.scroll.width}">
+                <waypoint named="content"/>
+                
+                <evenLayout axis="y" spacing="30" after="$once{classroot._.content._.list}"/>
+                
+                <list items="someset:/set/person"
+                      using="PersonItem"
+                      deferred="true"
+                      after="$once{canvas.datasets.someset}">
+                    <waypoint named="list"/>
+                </list>
+                
+            </view>
+            
+            <!-- scrollbar for the view -->
+            <listScroll name="scroll" 
+                        axis="y" itemheight="30" 
+                        x="${parent.width-this.width}" height="${parent.height}"
+                        scrolltarget="$once{classroot._.content}"
+                        list="$once{classroot._.content._.list}"/>
+        </view>
+    
+    </class>
+    
+        <!-- a class that bonds to a person element, so we'll call it a PersonItem -->
+    <class name="PersonItem" width="${parent.width}" height="30">
+        <waypoint/>
+        
+        <!-- when we get a binding, that means we have new data to parse and display -->
+        <handler name="onbinding">
+            this.firstname.setAttribute('text', this.bind.getNodeAttribute('firstname'));
+            this.lastname.setAttribute('text', this.bind.getNodeAttribute('lastname'));
+        </handler>
+
+        <!-- layout each field 100 pixels from each other, left to right -->
+        <evenLayout axis="x" spacing="100" after="$once{classroot}"/>
+        
+        <!-- the two fields that will hold our data: -->
+        
+        <checkbox value="false" valign="middle">
+            <waypoint named="selected"/>
+        </checkbox>
+        
+        <!-- first name -->
+        <clickToEditField name="firstname" width="100" valign="middle">
+            <handler name="onedited">
+                classroot.bind.setNodeAttribute('firstname', this['text']);
+            </handler>
+        </clickToEditField>
+        
+        <!-- lastname -->
+        <clickToEditField name="lastname" width="100" valign="middle">
+            <handler name="onedited">
+                classroot.bind.setNodeAttribute('lasttname', this['text'])
+            </handler>
+        </clickToEditField>
+    </class>
+    
+    <horizontal/>
+    
+    <!-- instantiate two of this app-->
+    <MyApp/>
+    
+    <MyApp/>
+    
+</canvas>

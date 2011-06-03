@@ -1,0 +1,693 @@
+<library>
+
+    <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+         a special layout for the gallery that orders 
+         according to the "dpi" attribute (a number) 
+         for the position that views are laid out instead of
+         the order they appear in the subviews array. It is in 
+         effect the same as a wrapping layout on the x axis.
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+
+    <class name="reorderableLayout" extends="node">
+        <attribute name="spacing" type="number" value="0"/>
+        <attribute name="rowheight" type="number"/>
+        <attribute name="animate_all" type="boolean" value="false"/>
+        
+        <waypoint/>
+        
+        <handler name="onfinishing">
+            this.update(true);
+        </handler>
+        
+        <handler name="onrowheight">
+            this.update(true)
+        </handler>
+        
+        <method name="update" args="ignore">
+            <![CDATA[
+                var firstdone = false;
+                
+                //the current x/y of the layout updated on each subview encountered
+                var cx = 0;
+                var cy = 0;
+                
+                //a place to store views for animation after things have been laid out (faster?)
+                var animated_views = [];
+                var unanimated_views = [];
+                
+                for(var i = 0 ; i < parent.subviews.length ; i ++){
+                    var obj = parent.subviews[i];
+                    
+                    //skip the thing if it ignores layout.
+                    if(obj.options['ignorelayout'] || !obj['visible'])
+                        continue;
+                    
+                    //if the x coordinate is bigger then the width of the parent
+                    //increment by a fixed height number.
+                    if((cx + obj.width - 1) > parent.width && firstdone){
+                        cx = 0;
+                        cy += this.rowheight;
+                    }
+                   
+                    //flag for being past the first iteration.
+                    firstdone = true;
+                   
+                    //layout the subview
+                    if(this.animate_all || (parent['moving'] && (obj['selected'] || obj['enabled'] == false)))
+                        animated_views.push([obj, cx, cy]);
+                    else
+                        unanimated_views.push([obj, cx, cy]);
+                    
+                    //update the next x coordinate to use;
+                    cx += obj.width + this['spacing'];
+                }
+                
+                //run all animations BEFORE layout (looks nicer)
+                for(var i = 0 ; i < animated_views.length ; i ++){
+                    Utils.tween(animated_views[i][0], 'x', animated_views[i][1]);
+                    Utils.tween(animated_views[i][0], 'y', animated_views[i][2]);
+                }
+                
+                //run all constants AFTER animations (looks nicer)
+                for(var i = 0 ; i < unanimated_views.length ; i ++){
+                    unanimated_views[i][0].setAttribute('x', unanimated_views[i][1]);
+                    unanimated_views[i][0].setAttribute('y', unanimated_views[i][2]);
+                }
+                    
+                var done_method = new lz.Delegate(this, '_done');
+                lz.Timer.addTimer(done_method, Utils.global_animation_time);
+            ]]>
+        </method>
+        
+        <!-- run this after all animations have settled -->
+        <method name="_done" args="what">
+            Utils.nowlisteners(this, true);
+        </method>
+    </class>
+    
+    <!-- a type of list that supports drag and drop reordering of contents -->
+    <class name="reorderable">
+        <attribute name="layoutwidth" type="number"/>
+        <attribute name="selected" type="expression" value="$once{[]}"/>
+        <attribute name="busy" type="boolean" value="false"/>
+        <attribute name="marker" type="expression" value="$once{null}"/>
+        <attribute name="dropstack" type="expression"/>
+        <attribute name="dropstackicon" type="expression"/>
+        <attribute name="inspector" type="expression" value="$once{null}"/>
+        <attribute name="last_x" type="expression" value="0"/>
+        <attribute name="last_y" type="expression" value="0"/>
+        <attribute name="firstselected" type="boolean" value="false"/>
+        <attribute name="views_to_search" type="expression" value="$once{[]}"/>
+        <attribute name="moving" type="expression" value="false"/>
+        
+        <!-- when a new set of data is loaded, select the first view -->
+        <handler name="onfinishing">
+            <![CDATA[
+                this.setupDragViews([]);
+                if(this['firstselected'])
+                    if(this.subviews[0] != undefined)
+                        this.newSelection(this.subviews[0]);
+            ]]>
+        </handler>
+        
+        <method name="clearSelection" args="ignore">
+            <![CDATA[
+                //cause all selected objects to become unselected
+                for(var i = 0 ; i < this.selected.length ; i ++)
+                    this.selected[i].setAttribute('selected', false);
+                this.setAttribute('selected', []);
+            ]]>
+        </method>
+        
+        <method name="unselectAll" args="ignore">
+            <![CDATA[
+                //cause all selected objects to become unselected
+                for(var i = 0 ; i < this.subviews.length ; i ++){
+                    this.subviews[i].setAttribute('selected', false);
+                    this.subviews[i].setAttribute('enabled', true);
+                }
+
+                if(this['dropstack'])
+                    this.dropstack.clear(true);
+
+                this.setAttribute('selected', []);
+            ]]>
+        </method>
+        
+        <method name="selectAll" args="ignore">
+            <![CDATA[
+                this.selected = [];
+                for(var i = 0; i < this.subviews.length; i++){
+                    if(this.subviews[i]['enabled']){
+                        this.subviews[i].setAttribute('selected', true);
+                        this.selected.push(this.subviews[i]);
+                    }
+                }
+                
+                this.setAttribute('selected', this.selected);
+            ]]>
+        </method>
+        
+        <method name="newSelection" args="obj">
+            this.clearSelection(true);
+            this.addSelection(obj);
+        </method>
+        
+        <method name="addSelection" args="obj">
+            <![CDATA[
+                if(obj['enabled'] && Utils.indexOf(this.selected, obj) == -1){
+                    this.selected.push(obj);
+                    obj.setAttribute('selected', true);
+                    this.setAttribute("selected", this.selected);
+                }
+            ]]>
+        </method>
+        
+        <method name="removeSelection" args="obj">
+            if(obj['selected']){
+                Utils.remove_from_array(this.selected, obj);
+                obj.setAttribute('selected', false);
+                this.setAttribute('selected', this['selected']);
+            }
+        </method>
+        
+        <!-- given the list of subviews and an optional dropstack and dropstack menu, setup our views to drag over -->
+        <method name="setupDragViews" args="prepend_list">
+            <![CDATA[
+                //update the views that match this dragger everytime the list updates
+                for(var i = 0 ; i < this.subviews.length ; i ++)
+                    this.views_to_search.push(this.subviews[i]);
+                    
+                this.setAttribute('views_to_search', this.views_to_search);
+            ]]>
+        </method>
+
+        <method name="moveTheseBeforeMarker" args="selected">
+            <![CDATA[
+                if(this.marker.over){
+                    //if the marker is to the right or bottom of an object, increment the move_before_view 
+                    //target by one, else leave it alone.
+                    if(this.marker.direction.charAt(0) === "r" || this.marker.direction.charAt(0) === "b")
+                        var move_before_view = this.subviews[Utils.indexOf(this.subviews, this.marker.over)+1];
+                    else
+                        var move_before_view = this.marker.over;
+                        
+                    //are we using a passed in array or the default this.selected?
+                    var sel = selected != undefined ? selected : this.selected;
+
+                    //if we are trying to move the selection directly around something already selected
+                    //don't do it; it's not actually a very useful thing to do.
+                    if(Utils.indexOf(sel, move_before_view) != -1)
+                        return false;
+
+                    this.setAttribute('moving', true);
+                    this.list.moveViewsBefore(this, sel, move_before_view);
+                    this.setAttribute('moving', false);
+                }
+
+                return this.marker.over;
+            ]]>
+        </method>
+    </class>
+    
+    <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+         reorderer ITEMS GO INSIDE reorderer LISTS
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+    
+    <class name="reorderableView">
+        <!-- mouse tracking of selection -->
+        <attribute name="selected" type="boolean" value="false"/>
+        <!-- is this item active? -->
+        <attribute name="enabled" type="boolean" value="true"/>
+        
+        <multiclickable/>
+        <dragmatchable views="${classroot.parent.views_to_search}" dragicon="false"/>
+        
+        <!-- remove the selection for this object, if it exists -->
+        <handler name="onremoved">
+            parent.removeSelection(this);
+        </handler>
+            
+        <!-- when the mouse goes down start a timer. do not select until mouse up or drag is determined-->
+        <handler name="onsingleclick">  
+            <![CDATA[        
+                //if they are asking us to select an item...]
+                if(!this['selected']){
+                    //enable the selection for just this item
+                    if(lz.Keys.isKeyDown('control'))
+                        parent.addSelection(this);
+
+                    
+                    //enable the selection for a range of items.
+                    else if(lz.Keys.isKeyDown('shift')){
+                        var range = this.getRangeToSelectFrom(this);
+                        parent.clearSelection(true);
+                        for(var i = range[0] ; i < range[1] ; i ++)
+                            parent.addSelection(parent.subviews[i]);    
+                    }
+
+                    //enable the selection of this item to the *exclusion* of all others.
+                    else
+                        parent.newSelection(this);
+                }
+
+                //or deselect an item.
+                else
+                    parent.removeSelection(this);
+            ]]>
+        </handler>
+        
+        <handler name="ondrag" args="what">
+            parent.addSelection(this);
+            if(parent['marker'])
+                parent.marker.setAttribute('enabled', true);
+        </handler>
+        
+        <handler name="ondragdone" args="what">
+            if(parent['marker'])
+                parent.marker.setAttribute('enabled', false);
+        </handler>
+
+        <!-- if tracking this will get called on idle to test parent subviews for insertion point hovering -->
+        <handler name="ondragover" args="target">
+            <![CDATA[
+                //if it's over the dropstack but it's not open, never mind (skip it because it's still there just invisible)
+                if(target == parent['dropstack'] && !parent.dropstackicon.parent.pane.opened){
+                    //reject the item by setting dragover to false and returning
+                    this['dragover'] = false;
+                    return;
+                }
+                                        
+                //if it's the dropstack *icon* (seperate from the dropstack)
+                if(target == parent['dropstackicon'] && !parent.dropstackicon.parent.pane.opened)
+                    parent.dropstackicon.parent.open(true);    
+            ]]>
+        </handler>
+        
+        <!-- note that we don't use the ondragsent event because, for this
+             specific application, we rely on the marker to tell us not only
+             what view we matched, but what *side* we matched it on. ondragsent
+             is still very cool for everything else -->
+        <handler name="ondragdropped" args="what">
+             <![CDATA[    
+                //turn off the marker, as it's job is done. It's state corresponds to this match.
+                
+                if(parent['marker'])
+                    parent.marker.setAttribute('enabled', false);
+                    
+                if(what != parent['dropstack'] && what != parent['dropstackicon']){
+                    if(parent.moveTheseBeforeMarker(parent.selected)){
+                        if(parent['dropstack']){
+                            parent.dropstack.clear(true);
+                            parent['dropstackicon'].close(true);
+                        }
+                            
+                        parent.clearSelection(true);
+                    }
+                }
+            ]]>
+        </handler>
+        
+        <!-- if not enabled remove selection and darken, else lighten up -->
+        <handler name="onenabled">
+            if(!this['enabled']){
+                this.setAttribute('selected', false);
+                Utils.tween(this.disabledbox, 'opacity', 0.6);
+            }else{
+                Utils.tween(this.disabledbox, 'opacity', 0);
+            }
+        </handler>
+        
+        <method name="getRangeToSelectFrom" args="from">
+            <![CDATA[
+                var end_index = Utils.getLayer(from);
+                var start_index = 0;
+                
+                //NOTE remember that subviews may be undefined because of deferred replication!
+                
+                for(var i = end_index; i != 0 ; i --)
+                    if(parent.subviews[i] && parent.subviews[i] != from && parent.subviews[i]['selected']){
+                        var start_index = i;
+                        break;
+                    }
+                  
+                if(start_index == 0)
+                    for(var i = end_index; i < parent.subviews.length; i ++)
+                        if(parent.subviews[i] && parent.subviews[i] != from && parent.subviews[i]['selected']){
+                            var start_index = i;
+                            break;
+                        }
+  
+                var start = Math.min(start_index, end_index);
+                var end = Math.max(start_index, end_index);
+                
+                if(start == end)
+                    start = 0;
+                    
+                return [start, end+1];
+            ]]>
+        </method>
+        
+        <!-- a box that visually indicates when the item is not enabled  -->
+        <view name="disabledbox" 
+              width="${parent.width}" height="${parent.height}" 
+              bgcolor="0x111111" opacity="0">
+            <frontmost/>
+        </view>
+    </class>
+    
+    <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+         the cursor class provides visual feedback for a drag/drop insertion 
+         operation and is loosely coupled to the exhibit mousetracking implementation.
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+    
+    <class name="listMarker" options="ignorelayout">        
+        <!-- a reference to the container that holds the views this cursor will manage -->
+        <attribute name="reorderer" type="expression"/>
+        <!-- a reference to which object the cursor is over -->
+        <attribute name="over" type="expression" value="$once{null}"/>
+        <!-- is the cursor pointing to the top, bottom, left, or right of the object it's over -->
+        <attribute name="direction" type="string" value="nowhere"/>
+        <!-- a constant that adjusts the cursor position to make it center visually (e.g gradient cursor image) -->
+        <attribute name="cursorOffset" type="number" value="0"/>
+        <!-- true if the marker should always appear one way or the other -->
+        <attribute name="markerdirection" type="string"/>
+        <!-- if true, the marker is visible and tracks the objects assigned to it in the views attribute -->
+        <attribute name="enabled" type="boolean" value="false"/>
+        <!-- the delegate to use when the mouse moves -->
+        <attribute name="set_method" type="expression" value="$once{new lz.Delegate(this, 'set')}"/>
+        
+        <waypoint/>
+        
+        <!-- Metacomment; yes, we can identify any object on the screen using a breadth-first-reverse 
+             search - sweet on average cases - on the entire view tree, which we could cache at idle moments, 
+             or something with OS-level functionality like that. For web apps, specifying just the views to 
+             match is a useful computational-timesaving feature -->
+             
+        <handler name="onenabled">
+            <![CDATA[
+                if(this.enabled){
+                    //get the game started! when the mouse moves, we need to detect which view
+                    //we are over, and record pertinent information.
+                    this.set_method.register(lz.GlobalMouse, 'onmousemove');
+                    this.offtimer.setAttribute('enabled', true);
+                }else{
+                    this.set_method.unregisterAll();
+                    this.offtimer.setAttribute('enabled', false);
+                    //turn off all subcursors
+                    for(var i = 0 ; i < this.subviews.length ; i ++)
+                        this.subviews[i].setAttribute('opacity', 0);
+                }
+            ]]>
+        </handler>
+    
+        <method name="set" args="buf">
+            <![CDATA[
+                var target = Utils.whichViewIsMouseOver(this.reorderer.subviews);
+            
+                //we are not over anything, reflect that.
+                if(!target){
+                    this.setAttribute('over', false);
+                    return;
+                }
+            
+                //if we are looking at the dropstack compare using the canvas coordinates
+                var xpos = canvas.getMouse('x');
+                var ypos = canvas.getMouse('y');
+                
+                //get the relative x/y to use if it's the dropstack, or the plain x/y if it's a child of <reorderer>
+                var tx = target.getAttributeRelative('x', canvas);
+                var ty = target.getAttributeRelative('y', canvas);
+                var tw = parseInt(target.width);
+                var th = parseInt(target.height);
+                
+                var is_reorderableView = target instanceof lz.reorderableView;
+                
+                //match for the dropstack? note in the over and direction attributes and return true
+                if(!is_reorderableView){
+                    //turn off all subcursors:
+                    for(var i = 0 ; i < this.subviews.length ; i ++)
+                        this.subviews[i].setAttribute('opacity', 0);
+                    
+                    this.setAttribute('over', target);
+                    this.setAttribute('direction', 'any');
+                    return true;
+                }
+                
+                //Are we testing for left/right or up/down conditions? which of those resulting is it?
+                if(this['markerdirection'] == "vert" || this['markerdirection'] == undefined){
+                    if(xpos < (tx+(tw/2)))
+                        var dir = "left";
+                    else
+                        var dir = "right";
+                }else{
+                    if(ypos < (ty+(th/2)))
+                        var dir = "top";
+                    else
+                        var dir = "bottom";
+                }
+            
+                //if all is equal to the last run there is nothing to do
+                //return true because we did find a match..
+                if(target == this.over && dir == this.direction)
+                    return true;
+                
+                //set the x and y relative to the object we need to hover around and
+                //set the width or height of the cursor depending on orientation...
+                if(dir == "right"){
+                    Utils.tween(this, 'x', target.getAttributeRelative('x', this)+tw-this.cursorOffset);
+                    Utils.tween(this, 'y', target.getAttributeRelative('y', this));
+                    Utils.tween(this, 'height', th);
+                }
+                
+                else if(dir == "left"){
+                    Utils.tween(this, 'x', target.getAttributeRelative('x', this)-this.cursorOffset);
+                    Utils.tween(this, 'y', target.getAttributeRelative('y', this));;
+                    Utils.tween(this, 'height', th);
+                }
+                
+                else if(dir == "top"){
+                    Utils.tween(this, 'x', target.getAttributeRelative('x', this));
+                    Utils.tween(this, 'y', target.getAttributeRelative('y', this)-this.cursorOffset+1);
+                    Utils.tween(this, 'width', tw);
+                }
+                
+                else if(dir == "bottom"){
+                    Utils.tween(this, 'x', target.getAttributeRelative('x', this));
+                    Utils.tween(this, 'y', target.getAttributeRelative('y', this)+th-this.cursorOffset);
+                    Utils.tween(this, 'width', tw);
+                }
+
+                //we are ready, show the appropriate cursor for the direction given. 
+                
+                if(dir=="right" || dir == "left"){
+                    this['vert'].setAttribute('opacity', 0.5);
+                    this['horiz'].setAttribute('opacity', 0);
+                }else{
+                    this['horiz'].setAttribute('opacity', 0.5);
+                    this['vert'].setAttribute('opacity', 0);
+                }
+                    
+                //store a reference to what object the cursor is over and what direction the cursor is pointing
+                this.setAttribute('over', target);
+                this.setAttribute('direction', dir);
+            ]]>
+        </method>
+        
+        <timer name="offtimer" period="500" enabled="false">
+            <handler name="onperiod">
+                if(!Utils.isMouseAlmostOver(classroot['reorderer']))
+                    classroot.setAttribute('enabled', false);
+            </handler>
+        </timer>
+        
+        
+        <!-- the cursor image used for the top/bottom (horizontal) or left/right (vertical) pairs-->
+        <view name="horiz" opacity="0" stretches="both" width="${parent.width}" height="1" bgcolor="red"/>
+        <view name="vert"  opacity="0" stretches="both" height="${parent.height}" width="1" bgcolor="red"/>
+    </class>
+    
+    <!-- make a "dropstack" that will allow any number of individual pictures to be dragged in,
+     then dragged all out at once. -->
+      
+    <class name="reorderableDropstack">   
+        <!-- the list of views that the dropstack manages -->
+        <attribute name="reorderer" type="expression"/>
+        <!-- is the dropstack being hovered over (and how)? -->
+        <attribute name="hover" type="string" value="none"/>
+        <!-- what items have been placed on the drop stack? -->
+        <attribute name="stack" type="expression" value="[]"/>
+        
+        <multiclickable/>
+        
+        <!-- when the dropstack starts a drag, turn on the marker -->
+        <handler name="ondrag">
+            this.reorderer.marker.setAttribute('enabled', true);
+        </handler>
+        
+        <!-- note that we don't use the ondragsent event because, for this
+             specific application, we rely on the marker to tell us not only
+             what view we matched, but *what* side we matched it on. ondragsent
+             is still very cool for everything else -->
+        <handler name="ondragdone">
+            <![CDATA[
+                //turn off the marker.
+                this.reorderer.marker.setAttribute('enabled', false);
+
+                //if the marker is off we didn't find a match'
+                if(!this.reorderer.marker.over) return
+                    
+                //If the dropstacked tems were successfully repositioned
+                if(this.reorderer.moveTheseBeforeMarker(this['stack'])){
+                    //enable all the dropstacked items
+                    for(var i = 0 ; i < this.reorderer.selected.length ; i ++)
+                        this.reorderer.selected[i].setAttribute('enabled', true);
+
+                    //clear the dropstack
+                    this.clear(true);
+                    //and close the dropstack menu if we it
+                    if(this.reorderer['dropstackicon'])
+                        this.reorderer.dropstackicon.close(true);
+                }
+
+                this.reorderer.clearSelection(true);
+            ]]>
+        </handler>
+        
+        <!-- oh yeah, it's this simple. -->
+        <handler name="ondragdropped" args="what">
+            <![CDATA[
+                Debug.write("dropstack dropped");
+                //turn off the marker, we're done with it
+                this.reorderer.marker.setAttribute('enabled', false);
+                
+                //add the selected view of our reorderer
+                this.add(this.reorderer.selected);
+                
+                //mark all children as not enabled until dropstack cleared.
+                for(var i = 0 ; i < this.reorderer.selected.length ; i ++)
+                    this.reorderer.selected[i].setAttribute('enabled', false);
+                
+                this.reorderer.clearSelection(true);    
+            ]]>
+        </handler>
+        
+        <!-- add a list of objects to the dropstack -->
+        <method name="add" args="objs">
+            <![CDATA[
+                for(var i = 0 ; i < objs.length ; i ++)
+                    this.stack.push(objs[i]);
+                this.setAttribute('stack', this.stack);
+            ]]>
+        </method>
+
+        <!-- remove the contents of the dropstack re-enabling any objects in it. -->
+        <method name="clear" args="ignore">
+            <![CDATA[
+                for(var i = 0 ; i < this.stack.length ; i ++)
+                    this.stack[i].setAttribute('enabled', true);
+
+                this.setAttribute('stack', []);
+            ]]>
+        </method>
+    </class>
+
+    <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+         I am a base class for singleton coupled to a reorderer tag that floats to show metadata.
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+    
+    <class name="reorderableInspector" opacity="0">
+        <!-- a containing view we coupled to -->
+        <attribute name="reorderer" type="expression"/>
+        <!-- an object we are asked -->
+        <attribute name="what" type="expression"/>
+        <attribute name="lastwhat" type="expression" value="false"/>
+        <!-- so replicate tags can inherit a single datapath -->
+        <attribute name="ds" type="string"/>
+        <attribute name="dp" type="string"/>
+        <!-- if disabled, it ceases to show itself -->
+        <attribute name="enabled" type="boolean" value="false"/>
+        <!-- when "fixed" is set to an object the inspector is fixed, it will stay until set to false. binding
+             that time, it will have the correct reference to the fixed object while the what attribute
+             will continue to silently update to the actual current object. -->
+        <attribute name="fixed" type="boolean" value="false"/>
+        
+        <waypoint/>
+        
+        <handler name="onbinding">
+            this.refresh(true);
+        </handler>
+        
+        <handler name="oninit">
+            this.setAttribute('enabled', this['enabled']);
+        </handler>
+        
+        <!-- deactivate the highlite -->
+        <handler name="onenabled">
+            Utils.tween(this, 'opacity', this['enabled'] ? 1 : 0);
+        </handler>
+        
+        <handler name="onwhat">
+            if(this['what'])
+                Utils.nowlisteners(this, this['what'].bind);
+        </handler>
+        
+        <!-- when we leave being fixed, refresh our dimensions -->
+        <handler name="onfixed">
+            if(!this['fixed'])
+                this.refreshDimensions(this['what']);
+        </handler>
+        
+        <method name="refresh" args="ignore">
+            Utils.nowlisteners(this.what, this.what.bind);
+            Utils.nowlisteners(this, this.bind);
+        </method>
+        
+        <method name="refreshDimensions" args="from">
+            if(from == undefined) from = this.what;
+            if(!from) return;
+            
+            //get the attribute x/y to move the inspector to a given object
+            var wx = from.getAttributeRelative('x', this);
+            var wy = from.getAttributeRelative('y', this);
+
+            //set the inspector the incoming's width, height, x, y
+            this.setAttribute('width', from.width);
+            this.setAttribute('height', from.height);
+            
+            Utils.tween(this, 'x', wx, 100, undefined, {motion:'easein'});
+            Utils.tween(this, 'y', wy, 100, undefined, {motion:'easein'});
+        </method>
+        
+        <method name="moveTo" args="w">
+            <![CDATA[     
+                //if we are fixed-to-one-item, record the new thing we have moved to
+                //but do not cause the inspector to update - the what of the inspector
+                //will not correlate with the selected item in this case, but the fixed
+                //attribute will.
+                if(this['fixed']){
+                    this.setAttribute('what', w);
+                    this.setAttribute('lastwhat', w);
+                    return;
+                }
+              
+                if(w && w['enabled'] && !this.reorderer['dragging']){
+                    //if we have to actually move somewhere (not just same item)
+                    if(w != this['what']){
+                        this.refreshDimensions(w);
+
+                        //update the flags for this object on change
+                        this.setAttribute('dp', w.dp);
+                        this.setAttribute('ds', w.ds);
+                    }
+                }
+                
+                //fire the what handlers, now that we're prepared
+                this.setAttribute('what', w);
+                //after we've set 'what' and handlers have run, we can save it for the lastwhat:
+                this.setAttribute('lastwhat', w);
+            ]]>
+        </method>
+    </class>
+
+</library>

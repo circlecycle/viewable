@@ -1,0 +1,22 @@
+<canvas debug="true">
+    
+    <!-- component hierarchies (ordered low-level to high-level)-->
+    <include href="../framework/utils.lzx"/>
+    <include href="../framework/traits.lzx"/>
+
+    <!-- our first test of mixins -->
+
+        
+    <mixin name="parameterized">
+        <attribute name="parameter" type="string" value="default string"/>
+        <handler name="oninit">
+            Debug.write("My parameter is %w", parameter);
+        </handler>
+    </mixin> 
+    
+    <class name="testmixin" with="parameterized"/>
+        
+    <!-- this works -->
+    <testmixin parameter="overridden string"/>
+
+</canvas>

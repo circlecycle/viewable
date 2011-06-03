@@ -1,0 +1,57 @@
+<canvas debug="true">
+    <!-- component hierarchies (ordered low-level to high-level)-->
+    
+    <include href="../framework/utils.lzx"/>
+    <include href="../framework/traits.lzx"/>
+    <include href="../framework/upload.lzx"/>
+    <include href="../framework/list.lzx"/>
+    <include href="../framework/waypoint.lzx"/>
+    
+    <class name="testclass" bgcolor="red" extends="text">
+        <handler name="onbinding">
+            this.setAttribute('text', this.bind.getNodeAttribute('val'));
+        </handler>
+    </class>
+    
+    <dataset name="testset">
+        <one val="The first one"/>
+        <one val="The second one"/>
+        <one val="The third one"/>
+    </dataset>
+    
+    <fireLateEvent/>
+    
+    <handler name="onlate">
+        Debug.write("fire ondata event");
+        canvas.datasets.testset.ondata.sendEvent();
+    </handler>
+    
+    <view name="topbox" bgcolor="green" width="300" height="300">
+        <waypoint named="foo"/>
+        
+        <handler name="onmousedown">
+            testopenable.toggle(true);
+        </handler>
+    </view>
+
+    <view bgcolor="${canvas._.foo.bgcolor}" width="200" height="${canvas.topbox.height}">
+        <simplelayout axis="y"/>
+        <replicate over="testset:/one" using="testclass" after="${canvas.datasets.testset.finished}">
+            <handler name="onfinished">
+                Debug.write("canvas.subviews", canvas.subviews);
+            </handler>
+        </replicate>
+    </view>
+
+    <openable id="testopenable" bgcolor="blue" width="${parent.width}" opened="false">    
+        
+        <handler name="onopened">
+            if(this['opened'])
+                Utils.tween(this, "height", 100);
+            else
+                Utils.tween(this, "height", 0);
+        </handler>
+    </openable>
+    
+        
+</canvas>

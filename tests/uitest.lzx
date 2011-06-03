@@ -1,0 +1,12 @@
+<canvas debug="true">
+    <!-- our first test of the after trait -->
+    
+    <!-- component hierarchies (ordered low-level to high-level)-->
+    <include href="../framework/utils.lzx"/>  
+    <include href="../framework/traits.lzx"/>
+    <include href="../framework/layouts.lzx"/>
+    <include href="../framework/list.lzx"/>
+    <include href="../framework/ui.lzx"/>
+  
+
+</canvas>

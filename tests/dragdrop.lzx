@@ -1,0 +1,33 @@
+<canvas debug="true">
+    
+    <!-- component hierarchies (ordered low-level to high-level)-->
+    <include href="../framework/utils.lzx"/>
+    <include href="../framework/traits.lzx"/>
+
+    <!-- this class will inherently search a given set of views -->
+    <class name="dragmetome" width="30" height="30" bgcolor="blue">
+        <multiclickable/>
+        <dragmatchable views="${classroot.parent.subviews}"/>
+        
+        <handler name="ondragsent" args="target">
+            Debug.write("I (", this, ") was dragged onto", target);
+            target.setAttribute('bgcolor', this['bgcolor']);
+        </handler>
+        
+        <handler name="ondragdropped" args="target">
+            Debug.write("I (", this, ") just got ", target, " dropped onto me");
+        </handler>
+    </class>
+
+    <view>
+        <simplelayout axis="y"/>
+        <dragmetome bgcolor="blue"/>
+        <dragmetome bgcolor="red"/>
+        <dragmetome bgcolor="green"/>
+        <dragmetome bgcolor="yellow"/>
+        <dragmetome bgcolor="brown"/>
+        <dragmetome bgcolor="purple"/>
+        <dragmetome bgcolor="green"/>
+    </view>
+
+</canvas>

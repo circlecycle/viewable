@@ -1,0 +1,12 @@
+By James Robey, circlecycle@gmail.com
+
+https://github.com/circlecycle/viewable
+
+The Viewable framework is a set of tools for application development in OpenLaszlo, adding concepts and classes that ease large development of large projects.
+
+Under "framework" you'll find a set of .lzx files that make up the useful and importable parts of the framework into your own applications.
+
+Under "examples" you find some limited uses of the framework (TBD)
+
+Under "tests" are individual lax files meant to test the framework.
+

@@ -1,0 +1,5 @@
+<library>
+    <resource name="desktopbackground" src="background.jpg"/>
+    
+    <resource name="generic_application_icon" src="icons/generic_application_icon.png"/>
+</library>

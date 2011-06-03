@@ -1,0 +1,565 @@
+<library>
+
+    <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+         GENERAL PURPOSE METHODS USED THROUGHOUT THE PROJECT
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+     
+    <!-- ex.
+        <list name="[identifier]" 
+                   mutable="[true|FALSE]"
+                   autocommit="[true|FALSE]"
+                   items="[dataset:datapath/x/y/z|relativedatapath/x/y/z]" 
+                   using="[class to pair with nodes]" 
+                   deferred="false"
+                   after="$once{[chainable object]}">
+    -->
+    
+    <include href="smoothscroll.lzx"/>
+     
+    <class name="list" extends="node" with="chainable" after="$once{true}">
+        <attribute name="items" type="string"/>
+        <attribute name="using" type="string"/>
+        <attribute name="ds" type="string"/>
+        <attribute name="dp" type="string"/>
+        <attribute name="buffer" type="expression" value="$once{[]}"/>
+        <attribute name="mutable" type="boolean" value="true"/>
+        <attribute name="autocommit" type="boolean" value="true"/>
+        <attribute name="replication_parent" type="expression" value="$once{false}"/>
+        <attribute name="deferred" type="boolean" value="false"/>
+                
+        <handler name="onbinding">
+            this.refresh(true);       
+        </handler>
+        
+        <handler name="oninit">
+            <![CDATA[
+                //error checking should be no other subviews when we are made!
+                if(parent.subviews.length)
+                    Debug.write("error: there should be no other views acoompianing a list:", this);
+            
+                //we only need to commit mutable nodes, presuming we bulk commit them as advised.
+                //by adding them at init they are added in such an way that everything is done in 
+                //the correct order..
+                
+                if(this['mutable'])
+                    ListManager.addlist(this);
+
+                if(!this['using'])
+                    Debug.write("error: list class must have a using attribute:", this);
+                    
+                if(this['items'] && (!this.findReplicationParent() || !canvas.datasets[this.ds]))
+                    Debug.write("error: could not derive ds/dp from parent or self");
+            ]]>
+        </handler>
+        
+        <method name="findReplicationParent">
+            <![CDATA[
+                //disassemble the dataset given into dataset/datapath, which isn't too complex.
+                //@somename to get to a dataset under the parent of the replicate tag, or a normal
+                //somedataset:/some/path format like your used to.
+                //Essentially, is it relative, absolute, or a pointer to another list?
+                    
+                //if there are no items, then there is no parent -- just our buffer.
+                if(!this['items'])
+                    return;
+                
+                var colon_index = this.items.indexOf(":");
+                
+                //did we find a pointer to another id'd list? use that ds and dp
+                if(this.items.indexOf("@") == 0){
+                    var listid = this.items.slice(1);
+                    this['ds'] = global[listid].ds;
+                    this['dp'] = global[listid].dp;
+                }
+                
+                else if(colon_index >= 0){
+                    this['ds'] = this.items.slice(0, colon_index);
+                    
+                    var atsign_index = this['ds'].indexOf("@");
+                    if(atsign_index == 0)
+                        this['dslocal'] = this['ds'].slice(1);
+                        
+                    this['dp'] = this.items.slice(colon_index+1);
+                }
+                
+                //or else search up the tree for the first instance of a node with the data variable
+                //and NOTE that we start with our parent's parent - if we start with just our parent 
+                //then we'd really just be asking ourselves, since the parent of the replicate tag
+                //is the TARGET of the replicate tags actions.
+                else{
+                    var found_parent = false;
+                    for(var currParent = parent.parent ; currParent != canvas ; currParent = currParent['parent']){                        
+                        
+                        //if we found a node with a bind attribute, it's the target of a replicate tag
+                        if(currParent['ds'] && currParent['dp']){
+                            found_parent = true;
+                            this['replication_parent'] = currParent;
+                            
+                            //set the current ds and dp using the parent ds and dp.
+                            this['ds'] = currParent['ds'];
+                            this['dp'] = currParent['dp'] + '/' + this['items'];
+                            break;
+                        }
+                    }
+
+                    if(!found_parent){ //&& currParent != canvas (bug? -jr)
+                        Debug.write("Error: replicate tag: datapath information (.ds and .dp strings) not found anywhere on or above me: ", this);
+                        return false;
+                    }
+                }
+
+                //set the attributes on the parent as well (important, as 
+                //that parent's "ds" attribute will be detected to inherit ds/dp from!)
+                parent['ds'] = this['ds'];
+                parent['dp'] = this['dp'];
+                return true;
+            ]]>
+        </method>
+        
+        <!-- save the XML nodes we replicated over back where they came from! -->
+        <method name="commit" args="ignore">
+            <![CDATA[
+                if(!this['items'])
+                    return;
+                    
+                //if we are a relatively caluclated (ha! "unmutable", actually) list, we don't have a commit!
+                if(!this['mutable']){
+                    Debug.error("You cannot call commit() on a non-mutable replicate (it is implicit)");
+                    return;
+                }
+                    
+                //empty the container if the replicate has actually been used (not all are!)
+                if(this['container_pointer'] && this['container_pointer']['p']){
+                    for(var i = this['container_pointer'].p.childNodes.length - 1 ; i >= 0 ; i --)
+                        this['container_pointer'].p.removeChild(this['container_pointer'].p.childNodes[i]);
+                    
+                    //copy over the new entries, voila!
+                    for(var i = 0 ; i < this.buffer.length ; i ++)
+                        this['container_pointer'].p.appendChild(this.buffer[i]);
+                }
+            ]]>
+        </method>
+        
+        <method name="refresh" args="ignore">
+            <![CDATA[
+                //if there are subviews, remove all that are from a replicated source.
+                //note that we iterate backwards so that destroying views doesn't change the
+                //index of the remaining items                
+                
+                for(var i = immediateparent.subviews.length - 1 ; i >= 0 ; i --)
+                    immediateparent.subviews[i]['bind'] ? immediateparent.subviews[i].destroy() : false;
+                
+                //if no items then we do not prepare anything, just use the buffer items
+                //that are there "naturally" aka starting fresh then calling append, etc
+                if(this['items']){
+                    if(!canvas.datasets[this.ds]){
+                        Debug.write("error: didn't find dataset for list:", this);
+                        return;
+                    }
+                    
+                    //if we have a replicate_parent: pull from it's data, else replicate from the main tree:
+                    if(this['replication_parent']){
+                        this['container_pointer'] = this['replication_parent'].bind.dupePointer();
+                        this['container_pointer'].setXPath(Utils.parentFromPath(this.items));
+                    }else if(this['dslocal']){
+                        this['container_pointer'] = parent[this['dslocal']].getPointer();    
+                        this['container_pointer'].setXPath(Utils.parentFromPath(this.dp));
+                    }else{
+                        this['container_pointer'] = canvas.datasets[this.ds].getPointer();    
+                        this['container_pointer'].setXPath(Utils.parentFromPath(this.dp));
+                    }
+                    
+                    //bail if we don't have anything to do, or the xpath query call didn't work.
+                    if(!this['container_pointer']['p'] || !this['container_pointer'].p.hasChildNodes()){
+                        //set the data attributes on the replicate tag and the container (parent) tag (firing off any chained lists, by the way :)
+                        this.buffer = [];
+                        Utils.nowlisteners(this, true);
+                        return;
+                    }
+                        
+                    var query_length = this['container_pointer'].p.childNodes.length;
+                    query_length = query_length ? query_length : 0;
+                    
+                    //crucial aspect of buffering:
+                    //reference all the results over to the buffer, where we reorder the nodes.
+                    //when we commit, will make that order apply to the container in one pass.
+                    //if not mutable use the existing nodes.
+                    if(this['mutable']){
+                        this.buffer = [];
+                        for(var i = 0 ; i < query_length ; i++)
+                            this.buffer.push(this['container_pointer'].p.childNodes[i]);
+                    }else{
+                        this.buffer = this['container_pointer'].p.childNodes;
+                    }
+                }
+                    
+                //For each item resolved by the datapath given, make a string datapath that points
+                //to it alone, and use it to make a node. This makes a "init-time-only" form of replication.
+                //please note the dp index is +1 based, as specified by the openlaszlo dataset semantics!
+                var start = 0;
+                var end = this.buffer.length;
+                var class_to_make = lz[this.using];
+                
+                if(class_to_make == undefined){
+                    Debug.error("Error with replication: ", this.using, "is not a class as defined under the global lz namespace");
+                    Utils.nowlisteners(this, this.buffer);
+                    return;
+                }
+                    
+                var objs_to_init = [];
+                
+                //if we are deferred, run as if we finished and start deferred instantiation.
+                if(this['deferred'] === true){
+                    //let layouts run (they should skip undefined views gracefully)
+                    Utils.nowlisteners(this, true);
+                    return;
+                }
+                
+                //we are not deferred, so make all the objects now
+                
+                for(var index = start ; index < end ; index ++)
+                    this.instantiateChild(index);
+                    
+                //set the data attributes on the replicate tag and the container (parent) tag (firing off any chained lists, by the way :)
+                Utils.nowlisteners(this, true);
+                Utils.nowlisteners(parent, true);
+            ]]>
+        </method>
+        
+        <method name="invalidate" args="ignore">
+            <![CDATA[
+                return;
+                for(var i = immediateparent.subviews.length - 1 ; i >= 0 ; i --)
+                    immediateparent.subviews[i]['bind'] ? immediateparent.subviews[i].destroy() : false;
+            ]]>
+        </method>
+        
+        <method name="instantiateChild" args="index">
+            <![CDATA[
+                //find our zero base
+                if(parent.subviews[index])  return false;
+                //synthesize the path we need to get to the nth object being made
+                var newdp = this.dp + "[" + (index+1) + "]";
+        
+                //get a pointer to the *buffer path by indice
+                var dp = new lz.datapointer();
+                dp.setPointer(this.buffer[index]);
+                            
+                //create a new object of the given type in the namespace of the parent with defaults.
+                var obj = Utils.create(this.using, parent, {bind:dp, dp:newdp, ds:this.ds, dpi:index+1, boundlist:this}); 
+                
+                //obj is now the last thing in the parent.subviews array. move it to the index given.
+                parent.subviews[index] = parent.subviews.pop();
+                                
+                //push this onto a stack to be processed after everything has been made.
+                Utils.now(obj, dp);
+                return obj;
+            ]]>
+        </method>
+
+        <!-- this method will efficiently reorder the nodes of a mutable list, which is part of the original spec. -->
+        <method name="moveViewsBefore" args="container, selected_views, before_view">
+            <![CDATA[                
+                //can't do this operation if we are not mutable!
+                if(!this['mutable']){
+                    Debug.error("You cannot call moveViewsBefore() on a non-mutable replicate");
+                    return;
+                }
+            
+                //the list that will hold all the nodes that are not selected.
+                var unselected_views = [];
+
+                // if any of the selected are in this list, do not add them to unselected_views
+                for(var i = 0 ; i < container.subviews.length ; i ++){
+                    var isSelected = false;
+                    for(var j = 0 ; j < selected_views.length ; j ++){
+                        if(container.subviews[i] == selected_views[j]){
+                            isSelected = true;
+                            break;
+                        }
+                    }
+
+                    //if it's not selected, push the lz.DataElement on.
+                    if(!isSelected)
+                        unselected_views.push(container.subviews[i]); 
+                }
+
+                //now iterate through the unselected_views, inserting all selected_nodes
+                //into the list at the point we discover the before_view in the list.
+                var final_list = new Array();
+                //if before_view is not undefined then we want to *insert* nodes somewhere in the list. If it's 
+                //undefined, that means we want to append nodes to the end of the list (where undefined occurs
+                //if there is no object to put them before, QED)
+                if(before_view == undefined){
+                    final_list = unselected_views;
+                    for(var j = 0 ; j < selected_views.length ; j ++)
+                        final_list.push(selected_views[j]);
+                }else{
+                    for(var i = 0 ; i < unselected_views.length ; i ++){
+                        if(unselected_views[i] == before_view)
+                            for(var j = 0 ; j < selected_views.length ; j ++)
+                                final_list.push(selected_views[j]);
+
+                        final_list.push(unselected_views[i]);
+                    }
+                }
+                
+                //Loop over the items to set their new numbers (more intensive unrolled but acceptable for abstraction purposes, for now)
+                this.renumber(final_list);
+                
+                //set the new order on the buffer and container subviews
+                this.buffer = [];
+                container.subviews = [];
+                for(var i = 0 ; i < final_list.length ; i ++){
+                    this.buffer.push(final_list[i].bind.p);
+                    container.subviews.push(final_list[i]);   
+                }
+                
+                //if the autocommit flag is on, commit whenever we make a change.
+                if(this['autocommit'])
+                    this.commit(true);
+                    
+                Utils.nowlisteners(this, this.buffer);
+                Utils.nowlisteners(parent, true);
+            ]]>
+        </method>
+        
+        <!-- take the replicated nodes and renumber them based on their (new) order -->
+        <method name="renumber" args="l">
+            <![CDATA[
+                for(var i = 0 ; i < l.length ; i ++){
+                    var path = Utils.truncateAfterLast('[', l[i].dp);
+                    path = path + '[' + (i+1) + ']';
+                    l[i].dp = path;
+                    l[i].dpi = i+1;
+                }
+            ]]>
+        </method>
+    
+        <!-- remove a view from the list and also in the backing xml store -->
+        <method name="remove" args="views">
+            <![CDATA[
+                //if mutable get the attached binding and delete that:
+                if(!this['mutable'])
+                    Debug.error("You cannot call remove() on a non-mutable replicate tag.");
+                  
+                //if they pass false, erase all replicated items.
+                if(views === false){
+                    if(parent.subviews.length > 0)
+                        views = parent.subviews;
+                    else    
+                        return;
+                }
+                    
+                //promote views to a list if it isn't
+                else if(!(views instanceof Array))   
+                    views = [views];
+                
+                //loop through the items to delete backwards..
+                while(views.length != 0){
+                    var v = views.pop();
+                
+                    //call the destroy method of the given view, if it exists
+                    v.setAttribute('removed', true);
+                    
+                    //if it has a valid .p attribute, remove it from the buffer and delete it from the xml tree.
+                    Utils.remove_from_array(this.buffer, v.bind.p);
+                    
+                    //if the data element has a parent, it isn't just in our buffer but in the backing xml. remove that
+                    if(v.bind.p.parentNode)
+                        v.bind.deleteNode();
+                    
+                    //kill the item
+                    v.destroy();
+                }
+
+                //the dpi, or datapointer index, needs to be recalculated when remove things
+                this.renumber(parent.subviews);
+                
+                //if the autocommit flag is on, commit whenever we make a change.
+                if(this['autocommit'])
+                    this.commit(true);
+
+                //tell other machinery that we have finished a mutable operation on the list
+                Utils.nowlisteners(this, true);
+                Utils.nowlisteners(parent, true);
+            ]]>
+        </method>
+               
+        <!-- insert a view from the list and also in the backing xml store -->
+        <method name="insert" args="v, dplist">
+            <![CDATA[
+                if(!this['mutable']){
+                    Debug.error("You cannot call insert() on a non-mutable replicate");
+                    return;
+                }
+                
+                if(!(dplist instanceof Array))
+                    dplist = [dplist];
+                    
+                //some indexing business - what number to use (and adjust +1 for dp indexes!)
+                if(v == undefined)  var newindex = immediateparent.subviews.length+1;
+                else                var newindex = Utils.indexOf(immediateparent.subviews, v)+1;
+                
+                //Copy over into the tree at the end, and add it to the buffer. 
+                //it will be repositioned to the specified index, if necessary, below
+                
+                for(var i = 0 ; i < dplist.length ; i ++){
+                    var node = dplist[i].p.cloneNode(true);
+                    this.buffer.push(node);
+                    var data_pointer = new lz.datapointer();
+                    data_pointer.setPointer(node);
+                    if(this['deferred'])
+                        this.invalidate(true);
+                    else
+                        this.instantiateChild(this.buffer.length-1);
+                }
+                
+                if(v != undefined){ 
+                    //move the object where it is supposed to be in the views array.
+                    this.moveViewsBefore(immediateparent, [immediateparent.subviews[immediateparent.subviews.length-dplist.length]], v);
+                    
+                    //the dpi, or datapointer index, needs to be recalculated when remove things
+                    this.renumber(parent.subviews);
+                }
+                
+                //if the autocommit flag is on, commit whenever we make a change.
+                if(this['autocommit'])
+                    this.commit(true);
+                
+                //tell other machinery that we have finished a mutable operation on the list
+                Utils.nowlisteners(this, true);
+                Utils.nowlisteners(parent, true);
+            ]]>
+        </method>
+    
+        <!-- append one or many elements to the list -->
+        <method name="append" args="what">
+            <![CDATA[
+                if(!this['mutable']){
+                    Debug.error("You cannot call append() on a non-mutable list");
+                    return;
+                }
+                
+                this.insert(undefined, what);  
+                Utils.nowlisteners(this, true);
+                Utils.nowlisteners(parent, true);
+            ]]>
+        </method>
+        
+        <!-- take a given replicate tag and add all subnodes from a given container's datapointer  -->
+        <method name="appendFromPointer" args="containerDP">
+            //prepare to loop and accumulate
+            var curr_pointer = containerDP.dupePointer();
+            curr_pointer.selectChild();
+            var pointerArray = [];
+        
+            //take the pointers and append them to a list to be submitted
+            do{
+                pointerArray.push(curr_pointer.dupePointer());
+            }while(curr_pointer.selectNext())
+        
+            //submit the list of nodes to add to the exhibit list
+            this.append(pointerArray);
+            Utils.nowlisteners(this, true);
+            Utils.nowlisteners(parent, true);
+        </method>
+        
+        <!-- clear all the nodes this list is using -->
+        <method name="clear" args="ignore">
+            this.remove(false);
+        </method>
+    </class>
+    
+    <class name="listScroll" extends="scrolly">
+        <!-- the size of the objects in the scrolltarget. This lets us tell what objects
+             are currently being displayed -->
+        <attribute name="list" type="expression"/>
+        <attribute name="itemheight" type="number"/>
+        <attribute name="dim_lookup" type="expression" value="{x:'width', y:'height'}"/>
+        
+        <fireLateEvent/>
+                
+        <handler name="oninit">
+            if(this.list['deferred']){
+                //when the scrolltarget scrolls, start a timer.
+                this.registerScroll_method = new lz.Delegate(this, 'registerScroll');
+                this.registerScroll_method.register(this.scrolltarget, 'on'+this.axis);
+                
+                //when the scroll bar changes size (to match it's parent's size) also start a timer
+                //this is the only xy specific part of listScroll and it'll be fixed.
+                this.registerScroll_method = new lz.Delegate(this, 'registerScroll');
+                this.registerScroll_method.register(this, 'onheight');
+                
+                this.scrollComplete_method = new lz.Delegate(this, 'scrollComplete');
+            }
+        </handler>
+        
+        <handler name="onfinished" reference="this.list">
+            this.scrolltarget.setAttribute('height', this.list.buffer.length*this.itemheight);
+            this.scrollComplete(true);
+        </handler>
+
+        <method name="registerScroll" args="ignore">
+            lz.Timer.resetTimer(this.scrollComplete_method, 100);
+        </method>
+        
+        <method name="scrollComplete" args="ignore">
+            <![CDATA[
+                    //use the item size and the offset from zero to tell us what indices 
+                    //are on or near the display rectangle.
+                    var window_size = this.scrolltarget.parent[this.dim_lookup[this.axis]];
+                    var item_offset = Math.floor((-1*this.scrolltarget[this.axis])/this.itemheight);
+                    var item_range = [item_offset, item_offset + Math.floor(window_size/this.itemheight)];
+                    
+                    item_range[0] = Math.max(0, item_range[0]-2);
+                    item_range[1] = Math.min(this.list.buffer.length, item_range[1]+2);
+                    
+                    var any_done = false;
+                    
+                    for(var i = item_range[0] ; i < item_range[0]+(item_range[1]-item_range[0]) ; i ++)
+                        any_done = this.list.instantiateChild(i) || any_done ? true : false;
+                        
+                    //if one or more then one children 
+                    if(any_done){
+                        Utils.nowlisteners(this.list, true);
+                        Utils.nowlisteners(this.list.parent, true);
+                    }
+            ]]>
+        </method>
+    </class>
+    
+    <!-- it's much easier to conceive and execute a single manager that can commit all mutable lists
+         in the order in which they were received (reflecting the correct order to call them in respecting depth.)
+         (for a save event, presumably.) -->
+    <node id="ListManager">
+        <attribute name="lists" type="expression" value="$once{[]}"/>
+        
+        <method name="addlist" args="r">
+            this.lists.push(r);
+            this.setAttribute('lists', this['lists']);
+        </method>
+        
+        <method name="removelist" args="r">
+            Utils.remove_from_array(this.lists, r);
+            this.setAttribute('lists', this['lists']);
+        </method>
+        
+        <method name="commit" args="ignore">
+            <![CDATA[
+                //call commit on all BUFFERED replicate tags we have accumulated from their init sequences calling us.
+                //note that if an entry is undefined, we take it to mean that it has been removed from the scene and 
+                //when the new list is issued, will always have just the "alive" lists and not all of them (hopefully -- TEST!:)
+                var alive_lists = [];
+                for(var i = 0 ; i < this.lists.length ; i ++)
+                    if(this.lists[i] != undefined){
+                        this.lists[i].commit(true);
+                        alive_lists.push(this.lists[i]);
+                    }
+                    
+                this.setAttribute('lists', alive_lists);
+            ]]>
+        </method>
+    </node>
+
+</library>

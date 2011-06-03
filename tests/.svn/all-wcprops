@@ -1,0 +1,89 @@
+K 25
+svn:wc:ra_dav:version-url
+V 27
+/UI/!svn/ver/10/trunk/tests
+END
+create.lzx
+K 25
+svn:wc:ra_dav:version-url
+V 38
+/UI/!svn/ver/11/trunk/tests/create.lzx
+END
+ready.lzx
+K 25
+svn:wc:ra_dav:version-url
+V 37
+/UI/!svn/ver/11/trunk/tests/ready.lzx
+END
+test2.xml
+K 25
+svn:wc:ra_dav:version-url
+V 36
+/UI/!svn/ver/2/trunk/tests/test2.xml
+END
+chainable.lzx
+K 25
+svn:wc:ra_dav:version-url
+V 41
+/UI/!svn/ver/11/trunk/tests/chainable.lzx
+END
+people.xml
+K 25
+svn:wc:ra_dav:version-url
+V 38
+/UI/!svn/ver/11/trunk/tests/people.xml
+END
+mixins.lzx
+K 25
+svn:wc:ra_dav:version-url
+V 38
+/UI/!svn/ver/11/trunk/tests/mixins.lzx
+END
+subviews.lzx
+K 25
+svn:wc:ra_dav:version-url
+V 40
+/UI/!svn/ver/11/trunk/tests/subviews.lzx
+END
+test9.lzx
+K 25
+svn:wc:ra_dav:version-url
+V 37
+/UI/!svn/ver/12/trunk/tests/test9.lzx
+END
+replication.lzx
+K 25
+svn:wc:ra_dav:version-url
+V 43
+/UI/!svn/ver/12/trunk/tests/replication.lzx
+END
+lzdisplay.lzx
+K 25
+svn:wc:ra_dav:version-url
+V 40
+/UI/!svn/ver/2/trunk/tests/lzdisplay.lzx
+END
+waypoints.lzx
+K 25
+svn:wc:ra_dav:version-url
+V 41
+/UI/!svn/ver/11/trunk/tests/waypoints.lzx
+END
+uploading.lzx
+K 25
+svn:wc:ra_dav:version-url
+V 40
+/UI/!svn/ver/6/trunk/tests/uploading.lzx
+END
+test.xml
+K 25
+svn:wc:ra_dav:version-url
+V 35
+/UI/!svn/ver/2/trunk/tests/test.xml
+END
+dragdrop.lzx
+K 25
+svn:wc:ra_dav:version-url
+V 40
+/UI/!svn/ver/11/trunk/tests/dragdrop.lzx
+END

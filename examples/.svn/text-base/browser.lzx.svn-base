@@ -1,0 +1,247 @@
+<library>
+    
+    <include href="../framework/utils.lzx"/>
+    
+    <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+         the browser class coordinates sub componets and backend data access to display and manipulate  assets in a visually useful fashion.
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+         
+    <class name="browser" clip="true" width="${parent.width}" height="${parent.height}" with="chainable" autofire="true">
+        <!-- the height of each browserItem in the browser (excluded attributes are computed from parent size) -->
+        <attribute name="itemheight" type="number" value="24"/>
+        <!-- the width of each browserPane in the browser (excluded attributes are computed from parent size)-->
+        <attribute name="panewidth" type="number" value="200"/>
+        <!-- to "fool" replication into always having a root, set this to the dataset to be used for the browser -->
+        <attribute name="ds" type="string"/>
+        <!-- to "fool" replication into always having a root, set this to the datapath to be used for the browser -->
+        <attribute name="dp" type="string" value="/*"/>
+        <!-- the path of the right most tab -->
+        <attribute name="breadcrumbs" type="string" value="/"/>
+        
+        <waypoint/>
+        
+        <!-- if our wayparent is a windowpane, update it. a dirty hack until we have late constraints available -->
+        <handler name="onbreadcrumbs">
+            if(this._.parent instanceof lz.windowpane)
+               this._.parent.setAttribute('label', "Browser at: "+this.breadcrumbs); 
+        </handler>
+        
+        <!-- the cumulative path of the right-most tab -->
+        <method name="computeBreadcrumbs" args="ignore">
+            <![CDATA[
+                var msg = "";
+                for(var i = 1 ; i < this.panes.subviews.length ; i ++)
+                    if(this.panes.subviews[i] instanceof lz.browserPane)
+                        msg = msg + "/" + this.panes.subviews[i].pane_name;
+
+                this.setAttribute('breadcrumbs', msg);
+            ]]>
+        </method>
+        
+        <!-- the view holding the browserPane, to facilitate scrolling -->
+        <view name="panes" height="${parent.height-13}">
+            <!-- the first instance of a pane. It will create more panes as sibilings as needed -->
+            
+            <browserPane ds="${classroot.ds}" dp="${classroot.dp}" after="$once{classroot}"/>
+        </view>
+        
+        <!-- horizontal scrollbar -->
+        <scrollx name="scroll" axis="x" y="${classroot.height-this.height}" width="${classroot.width-18}" scrolltarget="$once{classroot.panes}"/>
+    </class>
+    
+    <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+         ONE HORIZONTAL PANE ELEMENT ################################################################################################
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+         
+    <class name="browserPane" width="${this._.parent.panewidth}" height="${parent.height}" clip="true" with="chainable"> 
+        <!-- the string dataset this browser polls -->
+        <attribute name="ds" type="string"/>
+        <!-- the string datapath this browser starts at -->
+        <attribute name="dp" type="string" value="/*"/>
+        <!-- the sanitized name of the  -->
+        <attribute name="pane_name" type="string" value="root"/>
+        <!-- the item height as passed in by the parent -->
+        <attribute name="itemheight" type="number" value="${this._.parent.itemheight}"/>
+        <!-- the last item in this pane that is traversed to make the next pane. -->
+        <attribute name="last_traversed" type="expression"/>
+             
+        <!-- when the list is done, compute our breadcrumb path -->
+        <handler name="onfinishing">
+            this._.parent.computeBreadcrumbs(true);
+        </handler>
+        
+        <waypoint/>
+        
+        <dropable type="files"/>
+        
+        <!-- when we receive a drag dropped event, it represents
+             a file drop from an external source - we are only registered to get files via
+             the dropable tag, after all -->
+        <handler name="ondragdropped" args="target">
+            <![CDATA[
+                //if the drag received is not fron our own pane, then it's a drag and drop operation
+                //copy here is very important - don't want to muck about in their list!
+                var targets = Utils.copyArray(target.parent.selected);
+                var somedone = false;
+                var r1 = target.parent.list;
+                var r2 = this._.list;
+                
+                Debug.write("r1, r2", r1, r2);
+
+                //for everthing selected from the target
+                for(var i = 0 ; i < targets.length ; i ++){
+                    var t = targets[i];
+                    if(t instanceof lz.browserItem && t._.parent != this){
+                        if((this.content != t.parent) && (Utils.indexOf(r2.buffer, t.bind.p) == -1)){
+                            somedone = true;
+                            r2.append(t.bind);
+                            r1.remove(t);
+                        }
+                    }else{
+                        Debug.write("skipped", t);
+                    }
+                }
+                
+                if(somedone){
+                    //if any were actually processed, commit the changes and
+                    r1.commit(true);
+                    r2.commit(true);
+                    
+                    //update all browsers
+                    Utils.nowlisteners(canvas.datasets.filesystem, true);
+                }
+                    
+            ]]>
+        </handler>
+        
+        <!-- when a drag event is hovering over us, give us a chance to react -->
+        <handler name="ondraghover" args="target">
+            <![CDATA[
+                if(target && (this.content !== target.parent))
+                    Utils.tween(this.draghover_highlite, 'opacity', 0.3);
+                else
+                    Utils.tween(this.draghover_highlite, 'opacity', 0);
+            ]]>
+        </handler>
+        
+        <handler name="ondragdone">
+            this.marker.setAttribute('enabled', false);
+        </handler>
+        
+        <!-- the effect layer for a draghover event -->
+        <fullview name="draghover_highlite" bgcolor="green" opacity="0"/>
+        
+        <!-- the effect later for the item highlte -->
+        <view name="highlite" bgcolor="0x88D547"/>
+        
+        <!-- must autocommit because other things use the xml via xpath and need to have access to it. -->
+        <reorderable name="content" marker="${parent.marker}" width="${classroot.width}" focusable="true"> 
+            <evenLayout name="l" spacing="${classroot.itemheight}" axis="y" after="$once{classroot._.list}"/>
+        
+            <list name="list"
+                  items="${classroot.ds+':'+classroot.dp}" 
+                  using="browserItem"
+                  autocommit="true"
+                  deferred="true"
+                  after="$once{classroot}">
+                <waypoint named="list"/>
+            </list>
+        </reorderable>
+        
+        <!-- the marker for the reorderer system -->
+        <listMarker name="marker" reorderer="$once{parent.content}" markerdirection="horiz"/>
+        
+        <!-- scrollbar for the view -->
+        <listScroll name="scroll" 
+                         itemheight="${classroot.itemheight}" 
+                         scrolltarget="$once{classroot.content}"
+                         list="$once{classroot._.list}"
+                         x="${classroot.width-this.width}" height="${classroot.height}"/>
+                         
+        <!-- thin decorative line for the scroll bar (when it's invisible) -->
+        <view x="${classroot.width-this.width}" width="1" height="${classroot.height}" bgcolor="0x888888"/>
+        
+    </class>
+    
+    <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+         ONE VERTICAL PANE ELEMENT ################################################################################################
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+    
+    <class name="browserItem" width="${parent.width}" height="${this._.parent.itemheight}" extends="reorderableView">
+        <!-- this is computed -->
+        <attribute name="type" type="string"/>
+        <!-- this is computed asset name -->
+        <attribute name="named" type="string" value="root"/>
+        <attribute name="traversed" type="boolean" value="false"/>
+        
+        <waypoint/>
+        
+        <!-- make any browser item draggable to any filedrop receptable container. -->
+        <dragmatchable type="files" dragicon="false"/>
+        
+        <!-- what to do when the asset is bound an xml item -->
+        <handler name="onbinding">
+            this.setAttribute('named', this.bind.getNodeAttribute('name'));
+            this.setAttribute('type', this.bind.getNodeAttribute('type'));
+            this.label.setAttribute('text', this.bind.getNodeAttribute('name'));
+            this.label.setAttribute('fgcolor', (this['type'] == 'folder') ? '0x4949bE' : '0x000000');
+        </handler>
+        
+        <!-- change the highlite when this object becomes selected -->
+        <handler name="onselected">
+            Utils.tween(this.highlite, 'opacity', this['selected'] ? 0.5 : 0);
+        </handler>
+        
+        <!-- change the highlite when this asset (a folder) becomes traversed -->
+        <handler name="ontraversed">
+            Utils.tween(this.traversed_highlite, 'opacity', this['traversed'] ? 0.2 : 0);
+        </handler>
+        
+        <!-- when the item is double clicked, if it's a directory, traverse it. -->
+        <handler name="ondoubleclick">
+            <![CDATA[
+                if(String(this['type']) == String('folder') && this._.parent['last_traversed'] != this){
+                    var layer = Utils.getLayer(this._.parent);
+                    Debug.write("this._.parent.parent.subviews", this._.parent.parent.subviews);
+                    for(var i = this._.parent.parent.subviews.length-1 ; i > layer ; i --)
+                        this._.parent.parent.subviews[i].destroy();
+                    
+                    //create a new browser window. turn into method maybe
+                    var obj = Utils.create('browserPane', 
+                                            this._.parent.parent, 
+                                            {x:this._.parent.x+this._.parent['width'], 
+                                            ds:this['ds'], 
+                                            dp:this['dp']+'/*', 
+                                            pane_name:this['named'] });
+                    
+                    Utils.now(obj, true);
+                    
+                    this.setAttribute('traversed', true);
+                    if(this._.parent['last_traversed'])
+                        this._.parent.last_traversed.setAttribute('traversed', false);    
+                    this._.parent.setAttribute('last_traversed', this);
+                }                
+            ]]>
+        </handler>
+    
+        <!-- the effect layer for the hightlite -->
+        <fullview name="highlite" opacity="0" bgcolor="0xEEEA05" clickable="false"/>
+        <!-- the effect layer for the traversed hightlite -->
+        <fullview name="traversed_highlite" opacity="0" bgcolor="0x88D547" clickable="false"/>
+        <!-- the text label of the asset -->
+        <text name="label" valign="middle" clickable="false"/>
+    </class>
+    
+    <!-- define the class that merely configures a default browser subclass -->
+    <class name="standardBrowser" extends="browser"
+           ds="filesystem" dp="/set/*" 
+           panewidth="150" itemheight="24"
+           width="${parent.width}" height="${parent.height}"
+           after="$once{canvas.datasets.filesystem}"/>
+           
+    <!-- define a dataset to represent the filesystem with that all browsers manipulate -->
+    <listset name="filesystem" src="./filesystem.xml" request="true"/>
+    
+    <application named="FileBrowser" icon="generic_application_icon" type="files" using="standardBrowser"/>
+
+</library>

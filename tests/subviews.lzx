@@ -1,0 +1,15 @@
+<canvas debug="true">
+    <!--test to see if we have the behavior from the bringToFront/
+        sendToBack/subviews index mechanism that we want    -->
+    
+    <!-- component hierarchies (ordered low-level to high-level)-->
+    <include href="../framework/utils.lzx"/>  
+    <include href="../framework/traits.lzx"/>
+    
+    <handler name="oninit">
+        var a = [];
+        a[15] = "hi";
+        Debug.write("a, a.length", a, a.length);
+    </handler>
+    
+</canvas>

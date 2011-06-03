@@ -1,0 +1,28 @@
+<library>
+    
+    <!-- pull in all of our fun class library and framework.
+         Note that files that start with a lower-case letter
+         define things, while files with an upper-case letter
+         instantiate things -->
+         
+    <!-- includes we need -->
+    <include href="base/baseformitem.lzx"/>
+    <include href="base/multistatebutton.lzx"/>
+    
+    <!-- resources -->
+    <include href="resources.lzx"/>
+    
+    <!-- framework classes -->     
+    <include href="traits.lzx"/>
+    <include href="utils.lzx"/>
+    <include href="list.lzx"/>
+    <include href="layouts.lzx"/>
+    <!-- <include href="upload.lzx"/> -->
+    
+    <!-- component hierarchies -->
+    <include href="ui.lzx"/>
+    <include href="reordering.lzx"/>
+    <include href="smoothScroll.lzx"/>
+    <include href="highlites.lzx"/>
+    <include href="toolbar.lzx"/>
+</library>

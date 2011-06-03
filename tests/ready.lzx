@@ -1,0 +1,33 @@
+<canvas debug="true">
+    
+    <!-- component hierarchies (ordered low-level to high-level)-->
+    <include href="../framework/utils.lzx"/>    
+    
+    <view name="one">
+        <fireReadyEvent/>
+        <handler name="onpreready">
+            Debug.write("ready received!", this);
+        </handler>
+        
+        <view name="one_a">
+            <handler name="onpreready">
+                Debug.write("ready received!", this);
+            </handler>
+        </view>
+    </view>
+    
+    <view name="two">
+        <fireReadyEvent/>
+        <handler name="onpreready">
+            Debug.write("ready received!", this);
+        </handler>
+    </view>
+    
+    <view name="three">
+        <fireReadyEvent/>
+        <handler name="onpreready">
+            Debug.write("ready received!", this);
+        </handler>
+    </view>
+
+</canvas>

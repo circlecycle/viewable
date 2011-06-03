@@ -1,0 +1,71 @@
+<canvas debug="true">
+    <!-- our first test of the after trait -->
+    
+    <!-- component hierarchies (ordered low-level to high-level)-->
+    <include href="../framework/utils.lzx"/>  
+    <include href="../framework/traits.lzx"/>
+    
+    <!-- convenience class to experiment with the chainable mixin -->
+    <class name="chain" with="chainable"/>
+    
+    <!-- THIS MUST BE ABOVE ALL WAYPOINTS THAT USE IT IN THE
+         ATTRIBUTE. unlike assigning things on the optional preready 
+         stage where it is possible to have true random access to the 
+         DOM, waypoints use init because we would like the results 
+         to be available when constraints are evaluated, before preready. -->
+    
+    <!-- this should fire last, after two, inside this tag -->
+    <chain after="$once{this._.two}">
+        <waypoint named="three"/>
+                
+        <handler name="onprebound">
+            Debug.write("prebinding", this);
+        </handler>
+        
+        <handler name="onbound">
+            Debug.write("bound", this);
+        </handler>
+        
+        <handler name="onfinishing">
+            Debug.write("finished", this);
+            Debug.write("THIS._", this['_']);
+        </handler>
+        
+        <view>
+            <view>
+                <view>
+                    <!-- this should fire after one -->
+                    <chain after="$once{canvas._.one}">
+                        <waypoint named="two"/>
+                        
+                        <handler name="onprebound">
+                            Debug.write("prebound", this);
+                        </handler>
+                        
+                        <handler name="onbound">
+                            Debug.write("bound", this);
+                        </handler>
+                        
+                        <handler name="onfinished">
+                            Debug.write("finished", this);
+                        </handler>
+                    </chain>
+                    
+                </view>
+            </view>
+        </view>
+    </chain>
+    
+    <!-- This should fire first -->
+    <chain>
+        <waypoint named="one"/>
+        
+        <handler name="onready">
+            Debug.write("running now on one");
+            Utils.nowlisteners(this, true);
+        </handler>
+    </chain>
+    
+    
+
+</canvas>

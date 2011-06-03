@@ -1,0 +1,695 @@
+<library>
+
+    <!-- author : james robey : circlecycle@gmail.com -->
+    
+    <!-- [license here] -->
+
+    <!-- The traits file introduces a programming paradigm and offers some of th more obvious uses for
+         standardizing states, mouse events, and more. 
+
+        Traits are defined in computer science as (from http://en.wikipedia.org/wiki/Traits_class) in
+        the context of C++, anyway.
+        
+        "a class template template used to associate information or behaviour to a compile-time entity, 
+        typically a data type or a constant, without modifying the existing 
+        entity. In the C++ programming language, this is normally achieved by specializations for the relevant types."
+        
+        The laszlo-implementation of traits follows this concept. Stated another 
+        way, traits as orthogonal behaviors applied to a parent that modify or 
+        react to events or advertise new methods and attributes. 
+        
+        This means that a trait can offer new events and respond to other other events
+        on a parent without the parent ever explicitly knowing about it. It also means that
+        traits live side-by-side nondestructively, since a parent definition need not be
+        altered to include a new behaviour.
+        
+        Imagine the a really simple trait like "mousefollowable" which will cause it's 
+        parent to position itself whereever the mouse is on screen. In other words, without
+        rewriting the parent, cause a behaviour to be applied non-destructively to it.
+        
+        <class name="mousefollowable">
+            <handler name="onmousemove" reference="lz.GlobalMouse">
+                parent.setAttribute('x', newx);
+                parent.setAttribute('y', newy);
+            </handler>
+        </class>
+
+        The classes below define and extend this concept in to new and interesing abstractions. 
+        Each class has an example preceeding it. This file is dense with info; enjoy.
+    
+    -->
+ 
+    <!-- A very useful namespace mechanism. The waypoint class allows for "deep" navigation 
+         of nested namespaces by causing an entry specified by the "named" attribute 
+         to be added to the "parent waypoint" of the this one using that name. A parent waypoint 
+         is either the canvas, a node with an ID, or another waypoint anointed node
+         
+         Example:
+         
+         <class name="foo">
+            <waypoint/>
+            
+            <handler name="oninit">
+                Debug.write("this._.one", this._.one);
+            </handler>
+            
+            <view>
+                <view>
+                    <view>
+                        <waypoint named="one"/>
+                    </view>
+                </view>
+            </view>
+         </class>
+         
+    -->
+     
+    <class name="waypoint" extends="node" initstage="early">
+        <!-- if this attribute is specified, then a waypoint by this name will be added to the waypoint parent -->
+        <attribute name="named" type="string"/>
+        <attribute name="trap" type="boolean" value="false"/>
+
+        <!-- at construct time, determine the waypoint parent and add references, as/if needed -->
+        <method name="construct" args="p, a">
+            <![CDATA[
+                super.construct(p, a);
+                
+                //retrieve values from the tag
+                var named = a['named'];
+                var np = p.parent;
+                
+                //is the current parent we are applying to already a way point? do no more.
+                if(!p['_'])
+                    p['_'] = new Object;
+                else    
+                    return;                   
+
+                //we need do no more for the canvas element
+                if(p == canvas)
+                    return;
+                    
+                //find out which unnamed waypoint node above will receive the 
+                //new waypoint
+                while(1){
+                    
+                    //have we found a potential parent waypoint? We either find it above or use the topmost node.
+                    if(np['_'] || np['id'] || np.nodeLevel == 0){
+                                      
+                        //initialize space ('_') to hold waypoints if this is a new waypoint parent.
+                        if(np['_'] == undefined) np._ = {};
+
+                        //if no name given make a name based on the number of other nameless waypoints
+                        //otherwise ensure the name doesn't overwrite anything in the target waypoint space.
+                        if(!named){
+ 
+                            // if __waypointCount is not defined initialize it to zero, otherwise increment
+                            np.__waypointcount = np['__waypointcount'] != undefined ? np.__waypointcount + 1 : 0;                                               
+
+                            // and use value that to generate a unique name
+                            named = "unnammed_waypoint"+np.__waypointcount;
+                            
+                        }else if(np._[named] != undefined){
+                            Debug.warn('waypoint overwritten:', np, 'name', named);
+                        }
+
+                        //Add this node to a waypoint parent, add the waypoint to this node ("parent"), then break
+                        np._[named] = p;
+                        
+                        //record the parent waypoint to this tag
+                        p._.parent = np;
+                        break;
+                    }
+
+                    //...or just keep looking up the tree until we find a good target.
+                    np = np.parent;
+                }
+                
+                //we don't need the this anymore, it's done it's job (cyclic GC? investigate)
+            ]]>
+        </method>
+    </class>
+                
+    <!-- the chainable system allows for an arbitrary chain of notifications trickle
+         through the laszlo dom *out of order*, in other words, there need be no
+         hierarchial relationship between nodes so chained. The after system, initialized
+         by running the now() method on an instance so adorned, will cause prebinding,
+         binding, and finished events to fire on each node in the chain.
+         This is very useful, but most of all for replication and layouts (to minimize
+         spurious layout calls that occur during an operation, when just one operation 
+         at the end would have the same effect. 
+         
+         *bound causes other chaineds to fire
+         *binding handler on the parent instance to deal with that event
+         -->
+    <mixin name="chainable">
+        <attribute name="after" type="expression" value="false"/>
+        <attribute name="autofire" type="expression"/>
+        <attribute name="autofired" type="boolean"/>
+        
+        <fireReadyEvent/>
+        
+        <!-- the on readied event fires just before ready events are distributed
+             to all nodes either below the canvas or part of a new node tree being 
+             created by using the Utils.create() call.-->
+        <handler name="onpreready">
+            <![CDATA[
+                //an chained trait without a to can only initate a 
+                //chained cascade, but gets no events itself. Fix?
+                //constraints on such a thing:
+                
+                if(this['after'] &&  this.after !== true){
+                    this.prebinding_method = new lz.Delegate(this, "_prebound");
+                    this.prebinding_method.register(this.after, "onprebound"); 
+                    
+                    this.binding_method = new lz.Delegate(this, "_bound");
+                    this.binding_method.register(this.after, "onbound"); 
+                    
+                    this.finished_method = new lz.Delegate(this, "_finished");
+                    this.finished_method.register(this.after, "onfinished");
+                }
+            ]]>
+        </handler>
+        
+        <!-- this is when all ready events fire we are readied. if after == true 
+             we fire, else wait for a chained event. if autofire is set to true
+             and our after parent has autofired, the we fire now as well! -->
+        <handler name="onready">
+            <![CDATA[
+                if(this['after'] === true)
+                    Utils.now(this, true);
+                    
+                else if(this['after'] && this['autofire'] && this['after']['autofired'])
+                        Utils.now(this, true);
+            ]]>
+        </handler>
+        
+        <handler name="onprebound">
+            this.autofired = true;
+        </handler>
+        
+        <method name="_prebound" args="ignore">
+            this.setAttribute('bind', this.after.bind);
+            this.setAttribute('prebinding', this.after.bind);
+            this.setAttribute('prebound', this.after.bind);
+        </method>
+        
+        <method name="_bound" args="ignore">
+            this.setAttribute('binding', this.after.bind);
+            this.setAttribute('bound', this.after.bind);
+        </method>
+        
+        <method name="_finished" args="ignore">
+            this.setAttribute('finishing', this.after.bind);
+            this.setAttribute('finished', this.after.bind);
+        </method>
+
+    </mixin>
+        
+    <!-- when on a tag the parent will get a 'ondoubleclick' and 'onsingleclick' and 'onclicksdone' events
+         to faciliate smart mouse handling. note that onmouseup, down, etc. are still available to use.
+         
+         <class name="betterclicks">
+            <multiclickable/>
+            
+            <handler name="onsingleclick">
+                //...
+            </handler>
+            
+            <handler name="ondoubleclick">
+                //...
+            </handler>
+            
+            <handler name="ondrag">
+                //...
+            </handler>
+            
+            <handler name="ondragdone">
+                //...
+            </handler>
+         </class>
+    -->
+    
+    <class name="multiclickable" extends="node">
+        <attribute name="clicks" type="number" value="0"/>
+        <attribute name="dragging" type="boolean" value="false"/>
+        <attribute name="waiting" type="boolean" value="false"/>
+        <attribute name="mouseup_occured" type="boolean" value="false"/>
+        
+        <!-- make the parent class clickable; we reference it by parent, so it won't have any handlers by default, 
+             won't get clicks by default, and this class can't catch the clicks to do the good deed. So we make it clickable. -->
+        <handler name="oninit">
+            parent.setAttribute('clickable', true);
+        </handler>
+        
+        <!-- state machine: on mousedown prime the mechanism if we aren't already waiting, or just add to 
+             the number of clicks if we are waiting for clicks. -->
+        <handler name="onmousedown" reference="parent">
+            //we have succesfully elevated enabled into an API standard, so we can depend on it.
+            if(parent['enabled'] == false) return;
+            
+            if(!this['waiting']){
+                this['mouseup_occured'] = false;
+                this.setAttribute('dragging', false);
+                this.setAttribute('clicks', 1);
+                this.setAttribute('waiting', true);
+                //finally set how long we will wait for clicks before deciding what type of event we are seeing
+                lz.Timer.resetTimer(new lz.Delegate(this, "evaluateRecordedClicks"), Utils.double_click_delay);
+            }else{
+                this.setAttribute('clicks', this['clicks']+1)
+            }
+        </handler>
+        
+        <!-- if we receive a mouseup after evaluateRecordedClicks has been called, then this was a drag op; stop it
+             other wise we just note that we got a mouseup -->
+        <handler name="onmouseup" reference="parent">
+            <![CDATA[
+                this.setAttribute('mouseup_occured', true);
+                if(this['dragging'])
+                    parent.setAttribute('dragdone', true);
+            ]]>
+        </handler>
+        
+        <!-- Times UP! now we can infer if we've had one click, two, or a drag.
+             if a mouseup has occurred then it's single/double click and if not a drag. -->
+        <method name="evaluateRecordedClicks" args="buf">
+            this.setAttribute('waiting', false);
+            
+            if(this['mouseup_occured']){
+                if(this['clicks'] == 1)
+                    parent.setAttribute('singleclick', true);
+                if(this['clicks'] == 2)
+                    parent.setAttribute('doubleclick', true);
+            }else{
+                this.setAttribute('dragging', true);
+                parent.setAttribute('drag', true);
+            }
+        </method>
+    </class>
+
+    <node id="DropManager">
+        <attribute name="dropzones" type="expression" value="{}"/>
+    </node>
+    
+    <!-- we need to "register" a drop zone because otherwise constraints pointing at it won't work. -->
+    <class name="registerDropzone" extends="node">
+        <attribute name="named" type="string"/>
+        
+        <handler name="oninit">
+            if(!DropManager['dropzones'][this.named])
+                DropManager['dropzones'][this.named] = [];
+                
+            Debug.write("registered type: ", this.named);
+        </handler>
+    </class>
+    
+    <!-- dragmatchable provides a set of handlers for drag matching and logic uniformly across 
+         the application's z-depth hierarchy. Note that it depends on multiclickable, as do 
+         all enhanced click logic elsewhere in the framework.
+         
+         <class name="dragtest">
+            <multiclickable/>
+            
+            //use this syntax to detect a set of views on drag ops
+            <dragmatchable views="${classroot.parent.subviews}"/>
+            
+            //*OR* this syntax, to latch onto a global type
+            <dragmatchable type="files"/>
+            
+            <handler name="ondragsent">
+            </handler>
+            
+            <handler name="ondragdropped">
+            </handler>
+            
+            <handler name="ondragover">
+            </handler>
+            
+         </class>
+    
+    -->
+    
+    <class name="dragmatchable" extends="node">
+        <attribute name="views" type="expression"/>
+        <attribute name="type" type="string"/>
+        <attribute name="track_method" value="$once{new lz.Delegate( this , 'track' ) }" />
+        <attribute name="dragover" type="expression" value="$once{false}"/>
+        <attribute name="lastxy" type="expression" value="$once{[0,0]}"/>
+        <attribute name="lasthovered" type="expression" value="$once{false}"/>
+        <attribute name="reference" type="expression" value="$once{parent}"/>
+        <attribute name="dragicon" type="boolean" value="false"/>
+        
+        <!-- make the parent class clickable; we reference it by parent, so it won't have any handlers by default, 
+             won't get clicks by default, and this class can't catch the clicks to do the good deed. So we make it clickable. -->
+        <handler name="oninit">
+            parent.setAttribute('clickable', true);
+        </handler>
+
+        <!-- when we receive a dtag eeent, start a timer to run a function, periodically checks
+            what the mouse is over -->
+        <handler name="ondrag" reference="parent">
+            <![CDATA[
+                this.lastxy = [this.getMouse('x'), this.getMouse('y')];
+                //okay, this is a hack, but because all of this functionality on the children, we will
+                //also broadcast a dragging event on the parent, so that things can respond to it.
+                parent.setAttribute('dragging', true);
+
+                if(this['dragicon']){
+                    canvas.highlite.setAttribute('x', canvas.getMouse("x")-canvas.highlite.width/2);
+                    canvas.highlite.setAttribute('y', canvas.getMouse("y")-canvas.highlite.height/2);
+                    canvas.highlite.setAttribute('visible', true);
+                }
+                
+                if(this['type']){
+                    DropManager.dropzones[this.type].sort(this.sortMethod);
+                    DropManager.dropzones[this.type].reverse();
+                }else{
+                    this.views.sort(this.sortMethod);
+                    this.views.reverse();
+                }
+                this.track_method.register( lz.Idle, "onidle" );
+            ]]>
+        </handler>
+        
+        <!-- when we receive a dragdone event, stop the tracker and see what object, if 
+             any, we are over. send the dragsent method if so. -->
+        <handler name="ondragdone" reference="parent">
+            <![CDATA[
+                this.track_method.unregisterAll();
+                if(this['dragicon'])
+                    canvas.highlite.setAttribute('visible', false);
+                
+                if(this['lasthovered'])
+                    this.lasthovered.setAttribute('draghover', false);
+                    
+                parent.setAttribute('dragging', false);
+                
+                if(this['dragover']){
+                    parent.setAttribute('dragsent', this['dragover']);
+                    this['dragover'].setAttribute('draghover', false);
+                    this['dragover'].setAttribute('dragdropped', this.reference);
+                }
+            ]]>
+        </handler>
+        
+        <method name="sortMethod" args="a, b">
+            <![CDATA[
+                var a_chain = [];
+                var b_chain = [];
+                var i = 0;
+
+                //find depth for node
+                for(var p = a ; p !== canvas ; p = p.parent)
+                    a_chain.push(Utils.getLayer(p));
+                    
+                for(var p = b ; p !== canvas ; p = p.parent)
+                    b_chain.push(Utils.getLayer(p));
+                    
+                a_chain.reverse();
+                b_chain.reverse();
+                    
+                while(1){
+                    if(a_chain[i] == undefined || b_chain[i] == undefined)
+                        return (a_chain.length < b_chain.length) ? -1 : 1;
+                    else if(a_chain[i] < b_chain[i])
+                        return -1;
+                    else if(a_chain[i] > b_chain[i])
+                        return 1;
+                    else
+                        ++ i;
+                }
+            ]]>
+        </method>
+        
+        <method name="track" args="buf">
+            <![CDATA[
+                var x = Math.round(this.getMouse("x"));
+                var y = Math.round(this.getMouse("y"));
+                    
+                //if the mouse has moved..
+                if(this.lastxy[0] != x || this.lastxy[1] != y){               
+                    
+                    if(this['dragicon']){
+                        canvas.highlite.setAttribute('x', canvas.getMouse("x")-canvas.highlite.width/2);
+                        canvas.highlite.setAttribute('y', canvas.getMouse("y")-canvas.highlite.height/2);
+                    }
+                    
+                    if(this['type'])
+                        var views_to_search = DropManager.dropzones[this.type];
+                    else if(this['views'])
+                        var views_to_search = this.views;
+                    
+                    //for each view in our views_to_search
+                    if(views_to_search){
+                        var found = false;
+                        for(var i = 0 ; i < views_to_search.length ; i++){
+                            //Not a match? Return false.. (standard rectangle boundary test)
+                            if(Utils.isMouseOver(views_to_search[i]) && Utils.absVisible(views_to_search[i])){
+                                //same as last time?
+                                if(this['dragover'] == views_to_search[i]){
+                                    found = true;
+                                    break;
+                                }
+                                
+                                //we have new match:
+                                parent.setAttribute('dragover', views_to_search[i]);
+                                this.setAttribute('dragover', views_to_search[i]);
+
+                                //if the parent has silently changing over back to false, it didn't 
+                                //accept being over the object at this time, continue
+                                if(this['dragover'] == false)
+                                    continue;
+
+                                //otherwise let the object know it is being hovered over
+                                this['dragover'].setAttribute('draghover', this.reference);
+                                    
+                                //and turn off the last hover
+                                if(this['lasthovered'] && this['lasthovered'] != this['dragover'])
+                                    this.lasthovered.setAttribute('draghover', false);
+
+                                //the current hover is now the last hover
+                                this['lasthovered'] = views_to_search[i];
+
+                                //we are finished
+                                found = true;
+                                break;
+                            }
+                        }
+                        
+                        if(!found){
+                            this.setAttribute('dragover', false);
+                            if(this['lasthovered'] && this.lasthovered['draghover'] != false)
+                                this.lasthovered.setAttribute('draghover', false);
+                        }
+                            
+                    }
+                    
+                    //save the last x, y for comparison next time.
+                    this.lastxy = [x, y];
+                }
+            ]]>
+        </method>
+    </class>
+    
+    <!-- cute little convience class to give a parent view on an onidle event -->
+    <class name="fireLateEvent" initstage="late" extends="node">
+        <attribute name="late" type="expression" value="false"/>
+        <view>
+            <handler name="oninit">
+                classroot.parent.setAttribute('late', true);
+                parent.setAttribute('late', true);
+            </handler>
+        </view>
+    </class>
+    
+    <!-- marks an area as one of the registered global drag zones -->
+    <class name="dropable" extends="node">
+        <attribute name="type" type="string" value="global"/>
+                
+        <handler name="oninit">
+            DropManager['dropzones'][this.type].push(parent);
+        </handler>
+        
+        <handler name="onremoved">
+            Utils.remove_from_array(DropManager.dropzones[this.type], parent);
+        </handler>  
+    </class>
+    
+    <!-- this makes the parent moveable. it does not require multiclickable (the delay is annoying!) -->
+    <class name="moveable" extends="node">
+        <attribute name="direction" type="string"/>
+        <attribute name="update_method" type="expression" value="$once{new lz.Delegate(this, 'update')}"/>
+        <attribute name="minlimit" type="expression"/>
+        <attribute name="maxlimit" type="expression"/>
+        <attribute name="enabled" type="expression" value="true"/>
+        
+        <handler name="oninit">
+            parent.setAttribute('clickable', true);
+        </handler>
+        
+        <handler name="onenabled">
+        	Debug.write('enabled', this);	
+        </handler>	
+        
+        <handler name="onmousedown" reference="parent">
+            if(!this.enabled) return;
+            this.update_method.register(lz.GlobalMouse, "onmousemove");
+            this.firstxy = [parent.getMouse('x'), parent.getMouse('y')];
+            parent.setAttribute('dragging', true);
+        </handler>
+
+        <handler name="onmouseup" reference="parent">
+            if(!this.enabled) return;
+            this.update_method.unregisterAll();
+            parent.setAttribute('dragging', false);
+        </handler>
+        
+        <method name="update" args="ignore">
+            <![CDATA[
+                var relx = parent.getMouse('x') - this.firstxy[0];
+                var rely = parent.getMouse('y') - this.firstxy[1];
+                var x = parent.x + relx;
+                var y = parent.y + rely;
+                
+                if(!this['direction'] || this['direction'] == 'x'){
+                    if(!this['minlimit'] || this['minlimit'] < x)
+                        if(!this['maxlimit'] || this['maxlimit'] > x)
+                            parent.setAttribute('x', x);
+                }
+       
+                if(!this['direction'] || this['direction'] == 'y'){
+                    if(!this['minlimit'] || this['minlimit'] < y)
+                        if(!this['maxlimit'] || this['maxlimit'] > y)
+                            parent.setAttribute('y', y);
+                }
+            ]]>
+        </method>
+    </class>
+    
+    <!-- this makes the parent resizeable. it does not require multiclickable (the delay is annoying!) -->
+    <class name="resizeable" extends="node">
+        <attribute name="handle" type="expression"/>
+        <attribute name="enabled" type="boolean" value="true"/>
+        <attribute name="minwidth" type="number" value="0"/>
+        <attribute name="minheight" type="number" value="0"/>
+        <attribute name="update_method" type="expression" value="$once{new lz.Delegate(this, 'update')}"/>
+        
+        <handler name="onmousedown" reference="this.handle">
+            if(!this.enabled) return;
+            this.update_method.register(lz.GlobalMouse, "onmousemove");
+            this.firstxy = [this.handle.getMouse('x'), this.handle.getMouse('y')];
+        </handler>
+
+        <handler name="onmouseup" reference="this.handle">
+            if(!this.enabled) return;
+            this.update_method.unregisterAll();
+        </handler>
+        
+        <handler name="onenabled">
+            Debug.write("this.enabled, this.enabled");
+            this.handle.setAttribute('visible', this.enabled);
+        </handler>
+        
+        <method name="update" args="ignore">
+            var x = this.handle.getMouse('x') - this.firstxy[0];
+            var y = this.handle.getMouse('y') - this.firstxy[1];
+            parent.setAttribute('width', Math.max(this.minwidth, parent.width + x));
+            parent.setAttribute('height', Math.max(this.minheight, parent.height + y));
+        </method>
+    </class>
+    
+    <!-- make a pane sizeable in the y direction by use of a dragger strip.--> 
+    <class name="verticallysizeable"
+           align="center" y="${parent.height-this.height-this.spacing}" 
+           width="30" height="7">
+         
+        <attribute name="spacing" type="number" value="3"/>
+        <attribute name="minlimit" type="number" value="0"/>
+        <attribute name="maxlimit" type="number" value="65536"/>
+               
+        <moveable direction="y" maxlimit="${parent.maxlimit}" minlimit="${parent.minlimit}"/>
+        <frontmost/>
+        
+        <handler name="ony">
+            <![CDATA[
+                if(this.dragging){
+                    var new_height = this.y-this.height;
+                    if(new_height >= minlimit && new_height <= maxlimit )
+                        parent.setAttribute('height', this.y-this.height);
+                }
+            ]]>   
+        </handler>
+        
+        <handler name="onmouseover">
+            Utils.tween(this.highlite, 'opacity', 0.3);
+        </handler>
+        
+        <handler name="onmouseout">
+            Utils.tween(this.highlite, 'opacity', 0);
+        </handler>
+        
+        <view name="highlite" opacity="0" width="${parent.width}" height="${parent.height}" bgcolor="0xff0000" clickable="false"/>
+        
+        <view opacity="0.5" bgcolor="0x000000" width="${parent.width}" height="1"/>
+        <view opacity="0.5" bgcolor="0x393939" align="center" valign="middle" width="${parent.width/2}" height="1"/>
+        <view opacity="0.5" bgcolor="0x000000" valign="bottom" width="${parent.width}" height="1"/>
+    </class>
+
+    <!-- this is only meant to be extended from (virtual)
+            provides base open/close tracking (basic to UI) -->
+    <mixin name="openable">
+        <attribute name="opened" type="boolean" value="false"/>
+        
+        <handler name="oninit">
+            this.setAttribute('opened', this['opened']);
+        </handler>
+    
+        <method name="toggle" args="ignore">
+            if(this['opened']){
+                this.setAttribute('opened', false);
+            }else{
+                this.setAttribute('opened', true);
+            }
+        </method>
+    
+        <!-- all openable objects have the open method -->
+        <method name="open" args="ignore">
+            this.setAttribute('opened', true);
+        </method>
+    
+        <!-- all openable objects have the close method -->
+        <method name="close" args="ignore">
+            this.setAttribute('opened', false);
+        </method>
+    </mixin>
+    
+    <!-- this is a convienence class -->
+    <class name="openableview" with="openable"/>
+
+    <!-- this trait just toggles a selection status, which is distinct from open and
+         closing by virtue of intent, not function. The task is ot infer events orthogonal to other
+         existing traits provide and map them out, as you use them. They will grow as time goes on.  -->
+    <class name="selectable" extends="node">
+        <attribute name="selected" type="boolean" value="false"/>
+    
+        <handler name="onsingleclick" reference="parent">
+            parent.setAttribute('selected', !parent['selected']);
+        </handler>
+    </class>
+    
+    <!-- makes the parent the front most view. not a trait since it can interfere with the baseclass -->
+    <class name="frontmost" extends="node">
+        <handler name="oninit" reference="parent">
+            Utils.bringToFront(parent);
+        </handler>
+    </class>
+    
+    <!-- makes the parent the rearmost view. not a trait since it can interfere with the baseclass -->
+    <class name="hindmost" extends="node">
+        <handler name="oninit" reference="parent">
+            parent.sendToBack();
+        </handler>
+    </class>
+    
+   
+
+</library>

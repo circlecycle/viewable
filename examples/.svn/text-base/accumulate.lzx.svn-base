@@ -1,0 +1,44 @@
+<library>
+    <include href="../framework/library.lzx"/>
+    
+    <class name="fileObject" text="${this.bind.getNodeAttribute('name')}" extends="text">
+        <multiclickable/>
+        <dragmatchable type="files"/>
+    </class>
+ 
+    <class name="AccumulateApplication" width="${parent.width}" height="${parent.height}">
+        <vertical/>
+        <waypoint/>
+        
+        <text align="center" text="Drop files to zip up here"/>
+        
+        <standardpane innercolor="0xd6d6dd" clip="true" opacity="0.5"
+                        width="${parent.width}" height="${parent.height-this.y-parent.submit_button.height}">
+                        
+            <dropable type="files"/>
+            
+            <handler name="ondragdropped" args="target">
+                classroot._.list.append(target.bind);
+            </handler>
+            
+            <handler name="ondraghover">
+                Utils.tween(this, 'opacity', this.draghover ? 1 : 0.5);
+            </handler>
+                        
+            <view align="center" valign="middle">
+                <simpleLayout axis="y" after="$once{classroot._.list}"/>
+                
+                <list using="fileObject">
+                    <waypoint named="list"/>
+                </list>
+            </view>
+            
+        </standardpane>
+        
+        <aquaButton name="submit_button" label="download zip" align="center"/>
+    </class>
+    
+    <resource name="accumulate_icon" src="resources/icons/accumulate_icon.png"/>
+    <application named="Accumulate" icon="accumulate_icon" using="AccumulateApplication"/>
+
+</library>

@@ -1,0 +1,353 @@
+<!-- The whenable class is a major achievement that took many days of careful
+     thought to acheive the lightest, most powerful chaining solution.
+     any class with the whenable trait MUST have an "after" attribute declared on it
+     even if it is not used. If the after variable is constrained to anything (but
+     usually another whenable object in a cascade) then the initialization stages
+     are fired such that all things happen in the order expected. VERY DENSE CODE, 
+     very cool idea, and at the end of all the reversions, so little code :) :) -->
+<class name="whenable" extends="node">
+    <attribute name="enabled" type="boolean" value="false"/>
+
+    <method name="construct" args="p, a">
+        super.construct(p, a);
+        p.binding = false;
+        p.bind = false;
+        p.finished = false; 
+    </method>
+    
+    <handler name="oninit" reference="parent">
+        <![CDATA[
+            this.setAttribute('enabled', true);
+            if(parent['after'] === true)
+                Utils.fullNow(parent);
+        ]]>
+    </handler>
+    
+    <handler name="onafter" reference="parent">    
+        <![CDATA[
+            if(!this['enabled'] || !parent['after'])
+                return;
+                
+            Debug.write("parent['after']", parent['after'], parent);    
+            Utils.fullNow(parent);
+        ]]>
+    </handler>    
+</class>
+
+
+
+<!-- when now is called on an object, three events are
+     called in such an order that things may be built properly,
+     and without having to remember to issue the events in the
+     right order yourself everytime. these events are not arbitrary;
+     they are used by and work along with and extend the replicate
+     tag's functionality in this regard -->
+<method name="now" args="who, what">
+    if(what === true){
+        this.uniquenum = (this.uniquenum+1) % 99999;
+        what = {sender:who, value:this.uniquenum};
+    }
+
+    who.prebinding = what;
+    who.bind = what;
+    who.finished = what;
+    
+    who.setAttribute('prebinding', what);
+    who.setAttribute('binding', what);
+    who.setAttribute('finished', what);
+</method>
+
+<method name="fullNow" args="target">
+    target.prebind = target['after'];
+    target.bind = target['after'];
+    target.finish = target['after'];       
+    
+    target.setAttribute('prebind', target['after']);
+    target.setAttribute('bind', target['after']);
+    target.setAttribute('finish', target['after']);  
+    
+    this.nowlisteners(target, target['after']);
+</method>
+
+<!-- a whenpoint is a waypoint that will "fire" when it's whenpoint parent fires 
+
+    <class name="foo">
+        <whenpoint/>
+        
+        <handler name="oninit">
+            this.setAttribute('bind', true);
+        </handler>
+        
+        <view>
+            <view>
+                <view>
+                    <whenpoint named="one"/>
+                    
+                    <handler name="onbinding">
+                        Debug.write("i fired on binding!", this.bind);
+                    </handler>
+                </view>
+            </view>
+        </view>
+     </class>
+-->
+
+<class name="whenpoint" extends="waypoint">
+    <attribute name="group" type="string" value="global"/>
+    <attribute name="autofire" type="boolean" value="false"/>
+    <attribute name="autocascade" type="boolean" value="true"/>
+    
+    <method name="construct" args="p, a">
+        super.construct(p, a);
+        p.bind = false;
+        p.prebinding = false;
+        p.binding = false;
+        p.finished = false;
+        
+        //set the waypoint group.
+        
+        p._waypoint_group = this['group'];
+        Debug.write("p._waypoint_group, this['group']", p._waypoint_group, this['group']);
+    </method>
+    
+    <!-- when the parent is ready, autofire if we are configured to do so -->
+    <handler name="oninit" reference="parent">            
+        if(this['autofire'])
+            parent.setAttribute('bind', true);
+    </handler>
+
+    <!-- fire off three cascading, depth-first, events on all nodes below this one -->
+    <handler name="onbind" reference="parent">
+        <![CDATA[
+            if(!parent['bind']) return;
+            
+            //if they pass a literal true then subsititute a unique true-evaluating subsititute
+            //this bypassses bypass attribute disabling by duplicate value now and in the future
+
+            if(parent.bind === true){
+                var d = new Date();
+                parent.bind = d.getTime();
+            }   
+            
+            this.all_calculated_children = this.getAllSubWaypoints(true);
+            
+            parent.setAttribute('bind', parent.bind);
+            parent.setAttribute('prebinding', parent.bind);
+            parent.setAttribute('binding', parent.bind);
+            parent.setAttribute('finished', parent.bind);
+            
+            for(var i = 0 ; i < this.all_calculated_children.length ; i ++){
+                this.all_calculated_children[i].bind = parent.bind;
+                this.all_calculated_children[i].setAttribute('prebinding', parent.bind);
+            }
+            
+            for(var i = 0 ; i < this.all_calculated_children.length ; i ++){
+                this.all_calculated_children[i].bind = parent.bind;
+                this.all_calculated_children[i].setAttribute('binding', parent.bind);
+            }
+            
+            for(var i = 0 ; i < this.all_calculated_children.length ; i ++){
+                this.all_calculated_children[i].bind = parent.bind;
+                this.all_calculated_children[i].setAttribute('finished', parent.bind);
+            }
+        ]]>
+    </handler> 
+    
+    <!-- return the set of all waypoints under this object. This is bad OO, of course, because the
+         waypoint is going to inherit from THIS and these here references to an "_" will depend
+         on the waypoint to make, so it's not like the best OO pattern ever. It does accomplish one
+         crucial thing i wish to keep which is waypoint being it's own class for other projects, 
+         so i'm choosing this "hard-coded" approach  -->
+
+    <method name="getAllSubWaypoints" args="ignore">
+        <![CDATA[
+            var out = [];
+            var todo = [parent];
+            
+            Debug.write("parent['_waypoint_group']", parent['_waypoint_group']);
+            
+            while(todo.length){
+                var curr_todo = todo.shift();
+                
+                if(!curr_todo['_'] || curr_todo.nodeLevel == 0)
+                    break;
+                    
+                for(var key in curr_todo['_'])
+                    if(curr_todo['_'][key] && key != "parent"){
+                        var point = curr_todo['_'][key];
+                        
+                        //this will cause events to be fired only on sub-waypoints
+                        //that have the same group as this node. neat.
+                        
+                        if(String(point['_waypoint_group']) == String(parent['_waypoint_group'])){
+                            out.push(point);
+                        }
+                            
+                            
+                        todo.push(point);
+                    }
+            }
+
+            Debug.write("Waypoints to search:", out);
+            Debug.write("group", parent['_waypoint_group']);
+            Debug.write("---");
+            return out;
+        ]]>
+    </method>
+</class>
+
+
+<!-- cause all events to fire on an object as if was bound. -->
+<!-- DEPRECIATED -->
+<method name="now" args="who, what">    
+    <![CDATA[
+        //use a hack to bypass attribute disabling by duplicate value now and in the future
+        if(what === true){
+            var d = new Date();
+            var what = d.getTime();
+        }
+        
+        who.bind = what;   
+        who.setAttribute('prebinding', what);
+        who.setAttribute('binding', what);
+        who.setAttribute('finished', what);
+    ]]>
+</method>
+
+<interesting thing="filesystem_xml" available="false">
+    <handler name="ondata" reference="parent">
+        this.setAttribute('available', true);
+    </handler>
+</interesting>
+
+
+
+<!-- the interesting manager looks for things watching and being watched 
+         to ensure that all parties get to learn about eachother regardless
+         of when they are made in the hierarchy. interesteds and interestings
+         (traits) have groups and the interestings have names.. when a interesting
+         is made or a interested comes into existance in this group, the interested
+         will be informed of which interestings exist now - and will be informed
+         of those that exist later.
+
+         no example - this is used solely by the interesting trait system internally -->
+    
+    <node id="InterestingManager">
+        <attribute name="watched" type="expression" value="$once{{}}"/>
+        <attribute name="watching" type="expression" value="$once{{}}"/>
+        <attribute name="uniquenum" type="number" value="0"/>
+        
+        
+        <!-- what is a interested instance.-->
+        <method name="addInterested" args="what">
+            <![CDATA[
+                if(!this.watched[what.about])
+                    this.watched[what.about] = {};
+               
+                //if no name given make a name based on the number of other nameless waypoints
+                //otherwise ensure the name doesn't overwrite anything in the target waypoint space.
+                if(what['named'] && this.watched[what.about][what.named])
+                    Debug.write("Duplicate interesting:", what.named, what);
+                else{
+                    // if __waypointCount is not defined initialize it to zero, otherwise increment
+                    this.uniquenum = this['uniquenum'] != undefined ? this['uniquenum'] + 1 : 0;                                               
+                    // and use value that to generate a unique name
+                    what['named'] = "unnammed_interesting"+this['uniquenum'];
+                }
+                
+                if(this.watching[what.about])
+                    for(var i = 0 ; i < this.watching[what.about].length ; i ++ ){
+                        this.watching[what.about][i].parent.setAttribute('spotted', {named:what.named, reference:what.parent});
+                        this.watching[what.about][i].parent['_'][what.named] = what.parent;
+                    }
+            ]]>
+        </method>
+        
+        <method name="addInteresting" args="what">
+            <![CDATA[
+                //do we have a waypoint to store on? need it.
+                if(!what.parent['_']) what.parent._ = new Object;
+            
+                //if no record of whats watching this thing then make
+                //that list. need it.
+                if(!this.watching[what.thing])
+                    this.watching[what.thing] = [];
+                
+                //store what is interesting on the watching dict, where what.thing is 
+                //the name of the group the tag is associated with
+                this.watching[what.thing].push(what);
+                
+                //if this interesting thing is already watched then tell them
+                //it's been found.
+                if(this.watched[what.thing])
+                    for(var key in this.watched[what.thing]){
+                        //what.parent.setAttribute('spotted', {named:this.watched[what.thing][key]['named'], reference:this.watched[what.thing][key].parent});    
+                        Utils.now(this.watched[what.thing][key].parent, true);
+                        what.parent['_'][this.watched[what.thing][key]['named']] = this.watched[what.thing][key].parent;
+                    }
+            ]]>
+        </method>
+        
+        
+    </node>
+    
+    <!-- a interesting class has a unique name in any given group
+         and when activated, will inform a interested in that group
+         that it is now available, irrepective of whether the 
+         interested is made before or after this. Note that it inherits from
+         whenpoint, so it additionally provides a "root" that can start anywhere
+         for whenpoint subcomponents to sync to.
+
+         example:
+         
+         <class name="somethingInteresting">
+            <interesting thing="somenamewemakeup"/>
+
+            <handler name="onspotted">
+                Debug.write("I spotted ", this.spotted);
+            </handler>
+         </class>
+         
+         <class name="somethingInterested">
+            <interested about="somenamewemakeup"/>
+            
+            <handler name="onspotted">
+                Debug.write("I spotted ", this.spotted);
+            </handler>
+         </class>
+         
+         <somethingInteresting/>
+         
+         <somethingInterested/>
+         <somethingInterested/>
+         <somethingInterested/>
+         
+    -->
+         
+    <class name="interesting" extends="node">
+        <attribute name="thing" type="string"/>
+        <attribute name="available" type="expression" value="true"/>
+        
+        <fireReadyEvent/>
+        
+        <!-- if are available (default) then send the interesting event -->
+        <handler name="onready">
+            <![CDATA[
+                if(this['thing'] && this['available'])
+                    InterestingManager.addInteresting(this);
+            ]]>
+        </handler>
+        
+        <handler name="onavailable">
+            <![CDATA[
+                if(this['thing'] && this['available'])
+                    InterestingManager.addInteresting(this);
+            ]]>
+        </handler>
+    </class>
+
+
+
+
+
+

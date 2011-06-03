@@ -1,0 +1,180 @@
+
+<library>
+    
+    <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+         CORE DATASETS AND AUTHENTICATION
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+                     
+    <!-- The ACL provides the functional features required to couple 
+    	 visibility of views to the group or groups a user is in, and empties
+         datasets of old data when a user logs out. 
+    -->
+    
+    <class name="AccessControlLayer" with="chainable" after="$once{canvas.datasets.credentials}">
+        <attribute name="managedsets" type="expression" value="[]"/>
+        <attribute name="groups" type="expression" value="['notloggedin']"/>
+        <attribute name="user" type="string" value="anonymous"/>
+        <attribute name="changed" type="boolean" value="false"/>
+    
+        <!-- refresh / reload datasets when the credentials dataset changes! -->
+        <handler name="onprebinding">
+            //get the groups for the user
+            var groupsForUser = this.returnCurrentGroups();
+    
+            //if this dataset is in it, reload the dataset
+            for(var i in this.managedsets){
+                var entry = this.managedsets[i];
+                var ds = canvas[entry['name']];
+    
+                //do NOT process the credentials dataset this way. 
+                //it is the only dataset not to be so processed.
+                if(entry['name'] == 'credentials') continue;
+    
+                if(Utils.intersect([entry['group']], groupsForUser)){
+                    //reload the dataset if it's not a link type
+                    if(!entry['sendonly'])  ds.send(null, null, null);
+                }else{
+                    //wipe the dataset no matter what it is.    
+                    var dp = ds.getPointer();
+    
+                    dp.selectChild();
+                    while(1){
+                        dp.deleteNode();
+                        if(!dp.selectNext())  break;
+                    }
+                }
+            }
+    
+            //record the groups on the groups attribute of the ACL (this) and fire the changed event
+            var dp = canvas.datasets.credentials.getPointer();
+            this.setAttribute('user', dp.xpathQuery('set/user/@name'));
+            Debug.write(this.user);
+            this.setAttribute('groups', groupsForUser);
+            this.setAttribute('changed', true);
+        </handler>
+    
+        <!-- return a list of the the groups the current user belongs to. -->
+        <method name="returnCurrentGroups">
+            var dp = canvas.datasets.credentials.getPointer();
+            var groups = dp.xpathQuery('set/group');
+            var groupsForUser = [];
+    
+            for(var i in groups){
+                var groupElement = groups[i];
+                var groupName = groupElement.getAttr('name');
+                groupsForUser[groupsForUser.length] = groupName;
+            };
+    
+            return groupsForUser;
+        </method>    
+    
+        <method name="isUserInGroups" args="g">
+            return Utils.intersect([g], this.groups);
+        </method>
+    
+    	<!-- the login function sends the command to try to log the current user in.
+             It simply takes a name and a password. When the credentials dataset is
+             thus run the resulting state change will control what's seen by
+			 that user.
+        -->	
+        <method name="login" args="name, pw">
+            var o = new Object;
+            o.name = name;
+            o.pw = pw;
+            canvas.datasets.credentials.send(o, null, null);
+        </method>
+    
+    	<!-- send the command that wlll immediately log out the user, back
+  			 to the default "anonymous" group that all visitors start with -->	
+        <method name="logout" args="ignore">
+            var o = new Object;
+            o.logout = "true";
+            canvas.datasets.credentials.send(o, null, null);
+        </method>
+    </class>
+    
+    <!-- ############################ rest of these use the above  -->	
+    
+    <!-- a dataset must issue prebinding, binding, and finished (then done) events to
+    	 work with the chainable system, so we subclass it with another type of "go" message:
+    -->
+    <class name="localset" extends="dataset" with="chainable">
+    	<handler name="onready">
+        	Utils.nowlisteners(this, true);
+        </handler>	
+   	</class>
+    
+    <!-- a class that extends a dataset making it easy to send data with minimum 
+    	 syntax. By registering with the ACL, the dataset can be loaded or erased when	
+		 a user is or is not in a given set of groups, which is a handy automation      -->
+    
+    <class name="remoteset" extends="dataset" with="chainable" type="http" request="true">
+        <attribute name="group" type="string" value="anonymous"/>
+        <attribute name="sendonly" type="expression" value="false"/>	
+         
+        <!-- add this dataset to the ACL -->
+        <handler name="onpreready">
+        	//add data about this dataset to the ACL, so that it may be managed.
+            ACL.managedsets.push({ 
+                  'name':       this.name,
+                  'group':      this.group,
+                  'sendonly':   this.sendonly
+            })
+        </handler>
+        
+        <!--  when we check to get data make sure we don't have an empty dom -->	
+        <handler name="ondata">
+            <![CDATA[
+                var dp = this.getPointer();
+                var nodelen = dp.p.childNodes.length;
+                if(nodelen > 0)
+                    Utils.nowlisteners(this, true);
+            ]]>
+        </handler>
+        
+        <!-- when data is sent turn on the data icon and save the response before requesting data -->
+        <method name="send" args="obj, delegate, funcname">
+            if(!obj) obj = new Object();
+            this.setQueryString(null);
+            this.setQueryString(obj);
+            this.response = delegate ? new lz.Delegate(delegate, funcname) : false;
+            this.doRequest();
+        </method>
+    </class>
+    
+    <!-- make a remote command that differs only in that it does not use an initial request -->	
+    <class name="remotecommand" extends="remoteset" request="false"/>
+    
+    <!-- a secureview is like a normal view that accepts a group, so that it is not visible
+          when the group is not present in the credentials -->
+
+    <class name="secure" extends="node">
+        <attribute name="group" type="string"/>
+    
+        <handler name="oninit">
+            parent.setAttribute('visible', false);
+        </handler>
+    
+        <!-- when credentials change, this view will recalculate whether it can be shown -->
+        <handler name="onchanged" reference="ACL">
+            parent.setAttribute('visible', ACL.isUserInGroups(this.group));
+        </handler>
+    </class>
+    
+    <!-- credentials dataset, which is key to to all above security and user login 
+    	 information the server provides, can now be made and configured for 
+		 intended-singleton use -->
+    <remoteset name="credentials" src="http://127.0.0.1/mps/admin/credentials">	
+    	<handler name="ondata">
+        	Debug.write('got credentials');	
+        </handler>	
+        
+        <handler name="onerror" args="e">
+        	Debug.write('got credentials error', e);	
+        </handler>	
+    </remoteset>
+    
+    <!-- make a intended-singleton AccessControlLayer  -->	
+    <AccessControlLayer id="ACL"/>
+
+</library>

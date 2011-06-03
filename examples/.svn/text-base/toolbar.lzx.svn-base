@@ -1,0 +1,97 @@
+<library>
+    <!-- These two datasets represent one toolbar's left and right sides respectively,
+         where the entries configure the toolbar. -->
+                  
+    <dataset name="LeftGlobalToolbar">
+        <!-- Site Grinder Menu -->
+        <menu menuclass="applicationMenuItem" menuwidth="110"
+              paneclass="applicationPaneItem" panewidth="150"
+              tooltip="Run applications"/>
+    </dataset>
+      
+    <dataset name="RightGlobalToolbar">
+        <!-- Reveal Menu -->
+        <menu menuclass="revealMenuItem" menuwidth="110"
+              paneclass="false"
+              tooltip="Reveal all windows"/>
+    </dataset>
+    
+    <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+         classes used in the toolbar configuration are defined below
+         ....
+    -->
+    
+    <!-- every menu is composed of it's menu class and it's pane class, which can be/do anything it wants -->
+    <class name="applicationMenuItem" extends="toolbarmenu">
+        <handler name="onmousedown">
+            this.toggle(true);
+        </handler>
+        
+        <horiz spacing="3" align="center" valign="middle" clickable="false">
+            <view resource="generic_application_icon" valign="middle"/>
+            <text text="Applications" valign="middle"/>
+        </horiz>
+    </class> 
+    
+    <class name="applicationPaneItem" width="${parent.width}" x="5" y="5" extends="toolbarpane">
+        <waypoint/>
+        
+        <vertical spacing="3"/>
+        
+        <highlite name="highlite"/>
+        
+        <HasHighlitedViews width="${parent.width-10}" highliter="${parent.highlite}">
+            <vertical spacing="5"/>
+            
+            <!-- remember, no other views where a list is used -->
+            <list items="ApplicationRegistry:/applications/application"
+                   using="applicationEntry"
+                   after="$once{canvas.datasets.ApplicationRegistry}"
+                   autofire="true"/>
+        </HasHighlitedViews>
+        
+        <!-- spacer -->
+        <view/>
+    </class>
+    
+    <!-- this represents one of the applications registered with the global dataset holding that info. -->
+    <class name="applicationEntry" extends="HasHighlite">
+        <waypoint/>
+        
+        <handler name="onmousedown">
+            //make a new application on the desktop
+            
+            //get a UID to use for this window
+            var d = new Date();
+            var uid = d.getTime();
+            
+            //make a datapointer to an entry for an application
+            var appdp = Utils.makeReplicatedItem('application', {named:this.bind.getNodeAttribute('named'), 
+                                                                  using:this.bind.getNodeAttribute('using'),
+                                                                  icon:this.bind.getNodeAttribute('icon'),
+                                                                  appid:String(uid)},[]);                          
+                                                                  
+            //add the datapointer to the list of running applications; done                                                
+            RunningApplications.append(appdp);                                           
+            this._.parent.close(true);
+        </handler>
+
+        <horiz spacing="5" clickable="false">
+            <view resource="${classroot.bind.getNodeAttribute('icon')}" valign="middle"/>
+            <text text="${classroot.bind.getNodeAttribute('named')}" valign="middle" clickable="false"/>
+        </horiz>
+    </class>
+    
+    <!-- this causes the reveal trait, placed in the application subview space, to activate. the revealer requests only that children
+         respond to a selected state, by the way. -->
+    <class name="revealMenuItem" extends="toolbarmenu">
+        <multiclickable/>
+
+        <text text="(reveal)" valign="middle" align="center"/>
+        
+        <handler name="onsingleclick">
+            canvas._.apps.revealer.toggle(true);
+        </handler>
+    </class> 
+    
+</library>

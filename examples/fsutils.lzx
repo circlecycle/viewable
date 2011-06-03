@@ -1,0 +1,10 @@
+<library>
+    <node id="FSUtils">
+        <method name="isValidCopyOperation" args="target, list">
+            //if the datapath of r1 is a subset of r2, it's not allowed! easy.
+            Debug.write(target.dp);
+            Debug.write(r1.dp);
+            return (target.dp.indexOf(list.dp) != 0)
+        </method>
+    </node>
+</library>

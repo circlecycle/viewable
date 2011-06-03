@@ -1,0 +1,543 @@
+<library>
+
+    <!-- license -->
+
+    <!-- 
+         The utils package contains the most basic building blocks of the Viewable Group's Laszlo API.
+         The file supports classes which are either basic building blocks, useful abstractions for pre-existing
+         classes and most importantly, the Utils id'd node, instantiated at load time, which offers 
+         functions used throughout the project, which are either desireable or essential to use.
+         
+         The roster is:
+            listset (class):
+                I wrap a dataset to cause the bind event to fire on myself when data is received.
+                
+            fullview (class):
+                a normal view with width and height set to 100%
+                
+            vertical (class):
+                synonym for simplelayout axis y
+                
+            horizontal (class):
+                synonym for simplelayout axis x
+                
+            horiz (class):
+                a normal view with simplelayout axis x applied
+                
+            vert (class):
+                a normal view with simplelayout axis y applied
+                
+            timer (class):
+                a more convienent wrapper for the lz.timer construct
+                
+            sibling (class):
+                a trait that fires an event when any sibling node fires a given event 
+                
+            fireLateEvent (class):
+                causes an onlate event to fire on the parent, conveniently wrapping initstage="late"
+                
+            Utils (id):
+                These functions are used throughout the project and are lumped in here arbitrarily; it will grow over time
+    -->
+    
+    <include href="../framework/utils.lzx"/>  
+    <include href="../framework/traits.lzx"/>
+       
+    <!-- a dataset must issue prebinding, binding, and finished (then done) events to
+         work with the whenable system, so we subclass it for use within the framework -->
+         
+    <class name="listset" extends="dataset" with="chainable">
+        <handler name="ondata">
+            <![CDATA[
+                Debug.write("on data", this);
+                var dp = this.getPointer();
+                var nodelen = dp.p.childNodes.length;
+                if(nodelen > 0){
+                    Debug.write("got data!!");
+                    Utils.nowlisteners(this, true);  
+                }
+            ]]>
+        </handler>
+    </class>
+    
+    <class name="locallistset" extends="dataset" with="chainable"/>
+    
+    <!-- this replaces the scroll bar in all cases so that it doesn't appear if it's not needed. -->
+    <class name="scrollx" extends="scrollbar" axis="x" width="${parent.width}" visible="${Math.min(parent.width, this.scrolltarget.width) == parent.width}" usemousewheel="true"/>
+    <class name="scrolly" extends="scrollbar" axis="y" height="${parent.height}" visible="${Math.min(parent.height, this.scrolltarget.height) == parent.height}" usemousewheel="true"/>
+   
+    <!-- this class will run a function every period milliseconds. you can enable/disable it via boolean 'enabled' -->
+    <class name="timer">
+        <attribute name="period" type="number"/>
+        <attribute name="enabled" type="boolean" value="true"/>
+        <attribute name="stopped" type="boolean" value="true"/>
+        <attribute name="fire_method" type="expression" value="$once{new lz.Delegate(this, '_fire')}"/>
+        
+        <handler name="oninit">
+            this.setAttribute('enabled', this.enabled);
+        </handler>
+        
+        <handler name="onenabled">
+            <![CDATA[
+                if(this['enabled']){
+                    lz.Timer.addTimer(this.fire_method, this.period);
+                    this.setAttribute('stopped', false);
+                }else
+                    this.setAttribute('stopped', true);
+            ]]>
+        </handler>
+        
+        <method name="_fire" args="buf">
+            if(!this['stopped']){
+                this.setAttribute('period', this.period);
+                lz.Timer.addTimer(this.fire_method, this.period);
+            }
+        </method>
+    </class>
+    
+    <!-- sibling is an event collector will execute it's "child" method whenever a child view
+         with the specified event recieves that event. Useful for adding behaviors. 
+         
+         e.g. <catchevents event="onclick">
+                <handler name="oncaught">
+                    var val = this.caught;
+                    //etc.
+                </handler>
+              </sibling>
+         
+    -->
+    <class name="catchevents" extends="node">
+        <attribute name="event" type="string"/>
+        <attribute name="caught" type="expression"/>
+        <attribute name="reference" type="expression" value="false"/>
+                
+        <method name="_caught" args="what">
+            this.setAttribute('caught', what);
+        </method>
+        
+        <method name="update" args="ignore">
+            <![CDATA[
+                //if they pass a false value for the event just dont do anything. It helps with patterns.
+                if(!this['event']) return;
+
+                //for each subview, add a delegate such that the "caught" method on this class
+                //(overrided from the instance) will execute on the given event.
+
+                if(!this.reference)
+                    this.reference = parent;
+
+                for(var i = 0 ; i < this.reference.subviews.length ; i ++){
+                    var del = new LzDelegate( this, "_caught" ); 
+                    del.register(this.reference.subviews[i], this.event);
+                }
+            ]]>
+        </method>
+    </class>
+    
+    <!-- convenience class to experiment with the chainable mixin before runtime instantion is possible -->
+    <class name="chain" with="chainable"/>
+    
+    <class name="fireReadyEvent">
+        <handler name="oninit">
+            ReadyManager.nodes_to_ready.push(parent);
+        </handler>
+    </class>
+    
+    <!-- The ready mamanger implements a much needed feature; a true two pass init
+         environment. currently you get construct "on the way down" and init "on the
+         way up, but at init, anything above the initing node is not itself inited,
+         so it's impossible to utilize those nodes above. The ready manager addresses 
+         this problem. -->
+    
+    <node name="ReadyManager">
+        <attribute name="ready" type="expression" value="false"/>    
+        <attribute name="nodes_to_ready" type="expression" value="[]"/>
+    
+        <!-- when the canvas is inited, send ready events to all children -->
+        <handler name="oninit" reference="canvas">
+            Utils.setAttribute('top_created_object', false);
+            this.issueReadyEvents(true);
+        </handler>
+            
+        <method name="issueReadyEvents" args="ignore">
+            <![CDATA[
+                if(canvas.isinited){
+                    var d = new Date();
+                    var what = d.getTime();
+                    for(var i = 0 ; i < this.nodes_to_ready.length ; i ++)
+                        this.nodes_to_ready[i].setAttribute('preready', what);
+                        
+                    for(var i = 0 ; i < this.nodes_to_ready.length ; i ++)
+                        this.nodes_to_ready[i].setAttribute('ready', what);
+                        
+                    for(var i = 0 ; i < this.nodes_to_ready.length ; i ++)
+                        this.nodes_to_ready[i].setAttribute('postready', what);
+                        
+                    this.setAttribute('nodes_to_ready', []);
+                }
+            ]]>
+        </method>
+        
+    </node>
+    
+    <!-- This does two things. One is to advertise gloablly useful functions. The other is to hold 
+         globally useful attributes like enable_animations and dropzones. Some of these might have more
+         up to date patterns that acheive the same thing; feel free to point those out.
+    -->
+    
+    <node id="Utils">
+        <!-- if true animations occur -->
+        <attribute name="enable_animations" type="boolean" value="true"/>
+        <!-- how long do global animations take? -->
+        <attribute name="global_animation_time" type="number" value="300"/>
+        <!-- how long to wait for a second click of a multiclickable event -->
+        <attribute name="double_click_delay" type="number" value="150"/>
+        <!-- after stack - internal use only -->
+        <attribute name="after_animation_stack" type="expression" value="$once{[]}"/>
+        <!-- hold for test the topmost object of any recursive series of create calls. cool. -->
+        <attribute name="top_created_object" type="expression" value="$once{canvas}"/>
+        
+        <!-- put an item at the beginning of a list (use shift?) -->
+        <method name="prepend" args="list, item">
+            list.reverse();
+            list.push(item);
+            list.reverse();
+        </method>
+        
+        <!-- given two dictionaries, produce one unified dictionary -->
+        <method name="unionOfDict" args="d1, d2">
+            for(var key in d2)
+                d1[key] = d2[key];
+            return d1;
+        </method>
+        
+        <!-- find the last slash and truncate from there to get the parent from a string path -->
+        <method name="truncateAfterLast" args="c, path">
+            path = String(path);
+            return path.slice(0, path.lastIndexOf(c));
+        </method>
+        
+        <method name="parentFromPath" args="path">
+            return this.truncateAfterLast('/', path);
+        </method>
+        
+        <!-- Send an event ensuring that the event actually exists on the object to get it -->
+        <method name="event" args="what, event, arg">
+            var e = 'on'+event;
+            if(what[e] == undefined)
+                what[e] = new lz.Event(what, {name:e});
+            what[e].sendEvent(arg);
+        </method>
+        
+        <!-- given a dataset, remove all interior nodes -->
+        <method name="resetDataset" args="ds">
+            var edp = canvas.datasets[ds].getPointer();
+            if(edp.selectChild()){
+                do{
+                    edp.deleteNode();
+                }while(edp.selectNext());
+            }
+        </method>
+        
+        <!-- return the index of a given item in an array, or undefined if it doesn't exist -->
+        <method name="indexOf" args="list, item">
+            <![CDATA[
+                for(var i = 0 ; i < list.length ; i ++)
+                    if(list[i] == item)
+                        return parseInt(i);
+
+                return -1;
+            ]]>
+        </method>
+        
+        <!-- return the number value of the layer the given view (what) is positioned at. -->
+        <method name="getLayer" args="what">
+            return Utils.indexOf(what.parent.subviews, what);
+        </method>
+        
+        <!-- convience function for adding a normal timer (compare with the timer class in this file)  -->
+        <method name="timer" args="time, context, funcname">
+            var delegate = new LzDelegate(context, funcname);
+            lz.Timer.addTimer(delegate, time);
+        </method>
+        
+        <!-- return how many nodes are in a result set from an xpath selection -->
+        <method name="xpathCount" args="xpath">
+            var dp = new lz.datapointer();
+            var results = dp.xpathQuery(xpath);
+            
+            if(!results) return -1;
+            
+            if(!(results instanceof Array))
+                results = [results];
+                
+            return results.length;
+        </method>
+        
+        <!-- return the last item from an xpath expression -->
+        <method name="xpathLastItem" args="xpath">
+            var dp = new lz.datapointer();
+            var results = dp.xpathQuery(xpath);
+            return (results instanceof Array) ? results[results.length-1] : results;
+        </method>
+        
+        <!-- take a given replicate tag and add all subnodes from a given container's datapointer  -->
+        <method name="appendPointerContentsTolist" args="list, containerDP">
+            //prepare to loop and accumulate
+            var curr_pointer = containerDP.dupePointer();
+            curr_pointer.selectChild();
+            var pointerArray = [];
+        
+            //take the pointers and append them to a list to be submitted
+            do{
+                pointerArray.push(curr_pointer.dupePointer());
+            }while(curr_pointer.selectNext())
+        
+            //submit the list of nodes to add to the exhibit list
+            list.append(pointerArray);
+        </method>
+        
+        <!-- a global animate macro function that let's us turn it on and off globally. in swf9 we cannot override the 
+             baseclasses' animate method, so we wil use the also-common name "tween". Not bad. -->
+        <method name="tween" args="what, attr, to">
+            //use default time if none explictly provided.
+            var time = (arguments[3]==undefined) ? Utils.global_animation_time : arguments[3];
+            var options = (arguments[4]==undefined) ? {} : arguments[4];
+            
+            if(this.enable_animations)
+                what.animate(attr, to, time, options['relative'], options);
+            else
+                what.setAttribute(attr, to);
+        </method>
+        
+        <!-- is the mouse currently underneath a given view? -->
+        <method name="isMouseOver" args="what">
+            <![CDATA[
+                if(!what) return false;
+                var x = what.getMouse('x');
+                var y = what.getMouse('y');
+                
+                //outside bounds? 
+                if(x < 0 || x > what.width || y < 0 || y > what.height)
+                    return false; 
+                
+                //inside bounds..    
+                return true;
+            ]]>
+        </method>
+        
+        <!-- is the mouse almost or actually currently underneath a given view? -->
+        <method name="isMouseAlmostOver" args="what">
+            <![CDATA[
+                if(!what) return false;
+                var x = what.getMouse('x');
+                var y = what.getMouse('y');
+                
+                //outside bounds? 
+                if(x < -10 || x > what.width+10 || y < -10 || y > what.height+10)
+                    return false; 
+                
+                //inside bounds..    
+                return true;
+            ]]>
+        </method>
+        
+        <!-- because the speed of a for loop instead of method calls to the above isMouseOver functions  -->
+        <method name="whichViewIsMouseOver" args="what">
+            <![CDATA[
+                if(!what) return;
+                
+                for(var i = 0 ; i < what.length ; i++){
+                    if(what[i] == undefined) continue;
+                        
+                    var o = what[i];
+                    
+                    var x = o.getMouse('x');
+                    var y = o.getMouse('y');
+
+                    //outside bounds? 
+                    if(x < 0 || x > o.width || y < 0 || y > o.height)
+                        continue;
+
+                    //inside bounds..    
+                    return o;  
+                }
+                
+                return false;
+            ]]>
+        </method>
+        
+        <!-- return all views out of a given set that have the given attribute defined on it. -->
+        <method name="onlyViewsWithAttribute" args="views, attr"> 
+            <![CDATA[
+                var output = [];
+                for(var i = 0 ; i < views.length ; i ++)
+                    if(views[i][attr] != undefined)
+                        output.push(views[i]);
+                        
+                return output;
+            ]]>
+        </method>
+        
+        <!-- get the first visible view in a given parent, given that it is not a highlite. TODO, skip anything with ignorelayout option -->
+        <method name="getFirstVisibleView" args="what">
+            <![CDATA[
+                for(var i = 0 ; i < what.subviews.length ; i ++)
+                    if(what.subviews[i]['visible'])
+                        if(what.subviews[i]['name'] != 'highlite')
+                            return what.subviews[i];
+            ]]>
+        </method>
+        
+        <!-- convienence method: as it says, take pointer, path, and value to set the text on that node. -->
+        <method name="setNodeTextUsingPath" args="dp, path, value">
+            var node = new lz.datapointer();
+            node.setPointer(dp.xpathQuery(path));
+            node.setNodeText(value);
+        </method>
+        
+        <!-- convienence method: as it says, take pointer, path, and value to set the text on that node. -->
+        <method name="removeNodeUsingPath" args="dp, path">
+            var node = new lz.datapointer();
+            node.setPointer(dp.xpathQuery(path));
+            node.deleteNode();
+        </method>
+        
+        <!-- remove a given object from the array. -->
+        <method name="remove_from_array" args="arr, obj">
+            <![CDATA[
+                for(var i=0; i < arr.length; i++){ 
+                    if(arr[i] === obj){
+                        arr.splice(i, 1);
+                        break;
+                    }
+                }
+                return(arr);
+            ]]>
+        </method>
+        
+        <!-- return a new array from a given one and return it -->
+        <method name="copyArray" args="buf">
+            <![CDATA[
+                var final = [];
+
+                for(var i = 0 ; i < buf.length ; i ++)
+                    final.push(buf[i]);
+
+                return final;
+            ]]>
+        </method>
+        
+        <!-- anything passed to this will do it's state change after the global_animation_time period of the system, to finished the set of required changes. -->
+        <method name="setAfterAnimation" args="what, attr, value">
+            var after_delegate = new lz.Delegate(this, "_setAfterAnimation");
+            this['after_animation_stack'].push([what, attr, value]);
+            lz.Timer.addTimer(after_delegate, this.global_animation_time);
+        </method>
+        
+        <method name="_setAfterAnimation" args="ignore">
+            var todo = this['after_animation_stack'][0];
+            todo[0].setAttribute(todo[1], todo[2]);
+            this['after_animation_stack'] = this['after_animation_stack'].splice(1);
+        </method>
+        
+        <!-- when an object is brought to front, make sure the underlying subview order
+             reflects that. This is a major OL flaw, finally fixed.  -->
+        <method name="bringToFront" args="v">
+            <![CDATA[
+                v.bringToFront();
+                
+                var nsv = [];
+                for(var i = 0 ; i < v.parent.subviews.length ; i ++)
+                    if(v.parent.subviews[i] !== v)
+                        nsv.push(v.parent.subviews[i]);
+                        
+                nsv.push(v);
+                v.parent.subviews = nsv;
+            ]]> 
+        </method>
+        
+        <method name="absVisible" args="v">
+            for(var p = v ; p != canvas ; p = p.parent)
+                if(!p['visible'])
+                    return false;
+            return true;
+        </method>
+        
+        <method name="makeReplicatedItem" args="tagname, attrs, children">
+            <![CDATA[
+                if(children)
+                    var de = new lz.DataElement(tagname, attrs, children);
+                else
+                    var de = new lz.DataElement(tagname, attrs);
+                    
+                var dp = new lz.datapointer();
+                dp.setPointer(de); 
+                return dp;
+            ]]>
+        </method>
+        
+        <!-- force an attribute to fire by making a unique thing to send to it.-->
+        <method name="refresh" args="obj, what">
+            if(what === true){
+                var d = new Date();
+                var what = d.getTime();
+            }
+            
+            var node = Utils.nowlisteners(obj._.parent, what);
+        </method>
+        
+        <method name="now" args="what, value">
+            if(value === true){
+                var d = new Date();
+                value = d.getTime();
+            }
+            
+            what.setAttribute('bind', value);
+            what.setAttribute('prebinding', value);
+            what.setAttribute('prebound', value);
+            what.setAttribute('binding', value);
+            what.setAttribute('bound', value);
+            what.setAttribute('finishing', value);
+            what.setAttribute('finished', value);
+        </method>
+        
+        <method name="nowlisteners" args="what, value">
+            if(value === true){
+                var d = new Date();
+                value = d.getTime();
+            }
+            
+            what.setAttribute('bind', value);
+            what.setAttribute('prebound', value);
+            what.setAttribute('bound', value);
+            what.setAttribute('finished', value);
+        </method>
+                
+                
+                
+        <!-- use this to create new objects, since this will
+             ensure that the ready event is fired on all new objects
+        -->
+        <method name="create" args="classname, where, params">
+            var class_to_make = lz[classname];
+            var obj = new class_to_make(where, params);
+            
+            if(this.top_created_object === false)
+                this.setAttribute('top_created_object', this);
+                
+            if(this.top_created_object == this){
+                ReadyManager.issueReadyEvents(true);
+                this.setAttribute('top_created_object', false);     
+            }
+                
+            return obj;
+        </method>
+        
+        <method name="remove" args="v">
+            v.setAttribute('removed', true);
+            v.destroy();
+        </method>
+    </node>
+ 
+</library>

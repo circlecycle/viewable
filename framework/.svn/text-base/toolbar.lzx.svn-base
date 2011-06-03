@@ -1,0 +1,233 @@
+<library>
+    
+    <!-- a toolbar container take a dataset and pairs menu classes with pane classes and some glue
+         to get fully customizable menu items -->
+    <class name="toolbarContainer" with="chainable">
+        <attribute name="leftds" type="string" value="undefined"/>
+        <attribute name="rightds" type="string" value="undefined"/>
+        <attribute name="views_to_search" type="expression" value="$once{[]}"/>
+        
+        <frontmost/>     
+        <!-- menu bar background -->
+        <view width="${parent.width}" height="${parent.height}" bgcolor="0x777777" stretches="both" resource="menubar_background"/>
+        
+        <view name="left" width="${parent.width}" height="${parent.height}">
+            <simpleLayout axis="x" after="$once{parent.list}"/>
+            
+            <!-- replicate all the left-side menu items -->
+            <list name="list" 
+                  items="$once{classroot['leftds']+':/*'}" 
+                  using="toolbarMenuWrapper" 
+                  after="$once{classroot}"/>
+        </view>
+        
+        <view name="right" width="${parent.width}" height="${parent.height}">
+            <!-- when our parent's width changes, re-lay ourselves out -->
+            <simpleReverseLayout axis="x" after="$once{parent.list}">
+                <handler name="onwidth" reference="parent">
+                    this.update(true);
+                    Debug.write("parent.subviews", parent.subviews);
+                </handler>
+            </simpleReverseLayout>
+            
+            <!-- replicate all the right-side menu items -->
+            <list name="list" 
+                  items="$once{classroot['rightds']+':/*'}" 
+                  using="toolbarMenuWrapper"
+                  after="$once{classroot}"/>
+        </view>        
+    </class>
+    
+    <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+         TOOLBARITEM CLASS - ONE OF THESE IS MADE FOR EACH ENTRY DERIVED FROM A DATASET
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+         
+    <class name="toolbarMenuWrapper" with="chainable">
+        <!-- dervied from dataset -->
+        <attribute name="autocloses" type="boolean" value="true"/>
+        <!-- true if we open a surface to perform further actions, see the paneclass attribute on the dataset -->
+        <attribute name="has_pane" type="boolean" value="true"/>
+        <!-- if this fires the pane is a right-aligned pane, fired on init. -->
+        <attribute name="rightpaned" type="boolean" value="false"/>
+        
+        <multiclickable/>
+        
+        <!-- this wrapper is passed an xml element that specifies what classes should be used in the
+             construction of the toolbar menu. -->
+        
+        <handler name="onbinding">
+            //set our width and height from the dataset values
+            this.setAttribute('width', this.bind.getNodeAttribute('menuwidth'));
+            this.setAttribute('height', parent.height);
+            this.setAttribute('autocloses', this.bind.getNodeAttribute('autocloses'));
+            
+            //get info for our entry from our data attribute..
+            var menuname = this.bind.getNodeAttribute('menuclass');
+            //and make the menu
+            var menuobj = Utils.create(menuname , this, {width:this.width, height:this.height});
+            
+            //make the pane if one is specifed (give string 'false' to deactivate)
+            var panename = this.bind.getNodeAttribute('paneclass');
+            if(panename != "false")
+                var paneobj = Utils.create(panename, pane, {});
+            else
+                this.setAttribute('has_pane', false);
+            
+            //send data events to the menus if they exist (the menu class must)
+            menuobj.setAttribute('now', this.bind);
+            Utils.nowlisteners(menuobj, this.bind);
+            if(panename != "false") 
+                Utils.nowlisteners(paneobj, this.bind);
+                
+            //if we are drawing a right-aligned pane (is "right" in the name of the dataset? hacky, i know.)
+            if(String(parent.name) == String('right'))
+                this.setAttribute('rightpaned', true);
+        </handler>
+    
+        <!-- open any sibling views if the mouse is over them, used for 'gliding' across menus. -->
+        <method name="openSiblingIfMouseOver">
+            <![CDATA[
+                for(var i = 0 ; i < parent.subviews.length ; i ++)
+                    if(parent.subviews[i]['pane'])
+                        if(Utils.isMouseOver(parent.subviews[i]) && parent.subviews[i] != this){
+                            parent.subviews[i].open(true);
+                            return parent.subviews[i];
+                        }
+                        
+                return false;
+            ]]>
+        </method>
+        
+        <!-- close all panels and open this one -->
+        <method name="open" args="ignore">
+            <![CDATA[
+                this.close(true);
+                        
+                //if the button has no pane then do nothing! or perhaps toggle this pane back open, 
+                //closed, or open a another toolitem that the cursor has come to rest over..
+                if(this.has_pane)
+                    this.pane.open(true);
+            ]]>
+        </method>
+        
+        //convenience function to close the toolbar item (hiding it's pane)
+        <method name="close" args="ignore">
+            <![CDATA[
+                for(var i = 0 ; i < parent.subviews.length ; i ++)
+                   if(parent.subviews[i] instanceof lz.toolbarMenuWrapper)
+                       parent.subviews[i].pane.close(false);
+            ]]>
+        </method>
+        
+        <!-- toggle the state of the menu item -->
+        <method name="toggle" args="ignore">
+            this.pane.opened ? this.close(true) : this.open(true);
+        </method>
+        
+        <!-- this timer detects when to check if over other item -->
+        <timer name="offtimer" period="500" enabled="false">
+            <handler name="onperiod">
+                <![CDATA[
+                    //check to see if cursor is not over the pane but over another menu item
+                    if(Utils.isMouseOver(classroot.parent) && !Utils.isMouseOver(classroot))
+                        if(classroot.openSiblingIfMouseOver())
+                            return;
+                        
+                    //if not the above, check to see if we're not on anything at all..
+                    if(!(Utils.isMouseOver(classroot) || Utils.isMouseOver(classroot.pane)))
+                        parent.close(true);
+                ]]>
+            </handler>
+        </timer>
+                
+        <!-- a pane which is configurable and openable by dataset configuration and method calls. it opens and closes, and adjusts
+             to displaying left vs right panes in terms out outline and position. it contains whatever the 'paneclass' dp attribute specifies  -->
+        <openableview name="pane" opened="false" y="${parent.height}"
+                  width="$once{classroot.bind.getNodeAttribute('panewidth')}" 
+                  bgcolor="0xDDDEE0">
+                        
+            <!-- when this event is received, reconfigure our boxes and line art to be a right-sided pane item. -->
+            <handler name="onrightpaned" reference="classroot">
+                //make the pane align correctly
+                this.setAttribute('x', -parseInt(this.width)+parseInt(classroot.width));
+                //adjust top menu outline to match new pane position
+                this.t.setAttribute('x', 0);
+            </handler>
+            
+            <!-- what to do when opened/not opened -->
+            <handler name="onopened">
+                if(this['opened']){
+                    if(classroot['autocloses'] != 'false'){
+                        lz.ModeManager.makeModal(parent);
+                        classroot.offtimer.setAttribute('enabled', true);
+                    }
+                        
+                    Utils.tween(this, 'opacity', 0.92);
+                }else{
+                    if(classroot['autocloses'] != 'false'){
+                        classroot.offtimer.setAttribute('enabled', false);
+                        lz.ModeManager.release(parent);
+                    }
+                    this.setAttribute('opacity', 0);
+                }
+            </handler>
+            
+            <!-- outline -->
+            <view name="t" x="${classroot.width}" width="${parent.width-classroot.width}" height="1" bgcolor="0xAAAAdd"/>
+            <view name="r" x="${parent.width}" y="0" width="1" height="${parent.height}" bgcolor="0xAAAAdd"/>
+            <view name="b" y="${parent.height}" width="${parent.width}" height="1" bgcolor="0xAAAAdd"/>
+            <view name="l" x="-1" width="1" height="${parent.height}" bgcolor="0xAAAAAA"/>
+        
+            <!-- shadow -->
+            <shadowed/>
+        </openableview>
+        
+        <!-- seperator - which moves if the pane is a right-handed one. -->
+        <view name="sep" x="${parent.width-1}" width="1" height="${parent.height}" bgcolor="0xAAAAAA">
+            <handler name="onrightpaned" reference="classroot">
+                this.setAttribute('x', 0);
+            </handler>
+        </view>
+    </class>
+    
+    <!-- convenience class to make framework functions easier to access when making a toolbar pane -->
+    <class name="toolbarmenu">  
+        <method name="open" args="ignore">
+            parent.open(true);
+        </method>
+        
+        <method name="close" args="ignore">
+            parent.close(true);
+        </method>
+        
+        <method name="toggle" args="ignore">
+            parent.toggle(true);
+        </method>
+        
+        <!-- because we wrap their object, making themselves invisble should also make the parent invisible -->
+        <handler name="onvisible">
+            parent.setAttribute('visible', this.visible);
+        </handler>
+    </class>
+    
+    <!-- convenience class to make framework functions easier to access when making a toolbar pane -->
+    <class name="toolbarpane">
+        <method name="open" args="ignore">
+            parent.parent.open(true);
+        </method>
+        
+        <method name="close" args="ignore">
+            parent.parent.close(true);
+        </method>
+        
+        <method name="toggle" args="ignore">
+            parent.parent.toggle(true);
+        </method>
+    </class>
+</library>
+
+
+
+
+
+

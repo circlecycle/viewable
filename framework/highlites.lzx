@@ -1,0 +1,48 @@
+<library>
+    
+    <!-- next two classes relate with each other to enable one moveable onmouseover highlite on the children -->
+    
+    <class name="HasHighlitedViews">
+        <attribute name="highliter" type="expression" value="$once{this.highlite}"/>
+        <attribute name="time" type="expression" value="$once{Utils.global_animation_time}"/>
+        <attribute name="highliteopacity" type="number" value="1"/>
+        
+        <handler name="oninit">
+            this.highliter.setAttribute('opacity', 0);
+        </handler>
+        
+        <method name="_setHighlite" args="what">
+            var w = what['resourcewidth'] ? what.resourcewidth : what.width;
+            var h = what['resourceheight'] ? what.resourceheight : what.height;
+            var abs_x = what.getAttributeRelative('x', this.highliter);
+            var abs_y = what.getAttributeRelative('y', this.highliter);
+            
+            Utils.tween(this.highliter, 'opacity', this.highliteopacity, this.time, {});
+            Utils.tween(this.highliter, 'x', abs_x, this.time, {});
+            Utils.tween(this.highliter, 'y', abs_y, this.time, {});
+            Utils.tween(this.highliter, 'width', w, this.time, {});
+            Utils.tween(this.highliter, 'height', h, this.time, {});
+            Utils.tween(this.highliter, 'xoffset', what['xoffset'] ? what.xoffset : 0 , this.time, {});
+            Utils.tween(this.highliter, 'yoffset', what['yoffset'] ? what.yoffset : 0 , this.time, {});
+        </method>
+        
+        <method name="_hideHighlite">
+            Utils.tween(this.highliter, 'opacity', 0, this.time/2);
+        </method>
+    </class>
+    
+    <!-- see HasHighlitedViews -->
+    
+    <class name="HasHighlite" width="${parent.width}">
+        <handler name="onmouseover">
+            parent._setHighlite(this);
+        </handler>
+        
+        <handler name="onmouseout">
+            parent._hideHighlite();
+        </handler>
+    </class>
+    
+    <class name="highlite" resource="item_selection_over" stretches="both" options="ignorelayout"/>
+    
+</library>

@@ -1,0 +1,83 @@
+<canvas proxied="false" bgcolor="white"
+        width="100%" height="100%" 
+        fontsize="13"
+        font="Eurostile" debug="true">
+            
+    <!-- simple "you're okay" status messsage, mostly for SWF9 debugging peculiarities. -->
+    <handler name="oninit">
+        Debug.write("Everything Initialized Okay");
+    </handler>
+    
+    <debug/>
+        
+    <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+        Bring our modules into the application.
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->    
+        
+    <!-- component hierarchies (ordered low-level to high-level)-->
+    <include href="../framework/library.lzx"/>
+    <include href="../framework/resources.lzx"/>
+    <include href="resources/resources.lzx"/>
+    <include href="application.lzx"/>
+    <include href="toolbar.lzx"/>
+    <include href="browser.lzx"/>
+    <include href="accumulate.lzx"/>
+    
+    <!-- make a desktop background that we might change according to user preference -->
+
+    <fullview stretches="both" resource="desktopbackground"/>
+    
+    <!-- our desktop structure, from global menubar to application space to footer, if need be, -->
+    <fullview>
+        <vertical/>
+        
+        <!-- the global toolbar. note the attribute and see the dataset "globaltoolbar" for more -->
+        <toolbarContainer name="toolbar" width="${parent.width}" height="35"
+                          leftds="LeftGlobalToolbar" rightds="RightGlobalToolbar" 
+                          after="$once{true}">
+                          
+             <!-- show minmized windows as icons -->
+            <horiz align="center" valign="middle" clickable="false">
+                <simpleLayout axis="x" spacing="3" after="$once{parent.list}"/>
+            
+                <list name="list" 
+                       items="ApplicationRegistry:/running/application"
+                       using="minimizedApplicationWindow"
+                       after="$once{RunningApplications}"
+                       autofire="true"/>
+            </horiz>
+        </toolbarContainer>
+                          
+        
+        <!-- a decorative shadow that doesn't overlay maximized windows (or any window for that matter) -->
+        <upperShadow y="${parent.toolbar.height}"/>   
+        
+        <fullview height="${parent.height-this.y}">
+            <waypoint named="apps"/>
+            <reveal name="revealer"/>
+            
+            <method name="getAppFromId" args="appid">
+                <![CDATA[
+                    for(var i = 0 ; i < this.subviews.length ; i ++)
+                        if(this.subviews[i] && this.subviews[i]['appid'] == appid)
+                            return this.subviews[i];
+                ]]>
+            </method>
+            
+            <list id="RunningApplications"
+                   items="ApplicationRegistry:/running/application"
+                   using="ApplicationWindow"
+                   autocommit="true"
+                   after="true"/>
+            
+             <!-- all applications are invoked inside of this container -->
+        </fullview>
+    </fullview>
+                                         
+    <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+         anything of global scope that must exist above all other layers is included here
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+    
+    <view name="highlite" visible="false" width="20" height="20" bgcolor="blue" opacity="0.3" clickable="false"/>
+
+</canvas>

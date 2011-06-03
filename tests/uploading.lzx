@@ -1,0 +1,61 @@
+<canvas debug="true">
+    
+    <!-- component hierarchies (ordered low-level to high-level)-->
+    <include href="../framework/utils.lzx"/>
+    <include href="../framework/traits.lzx"/>
+    
+    <replicatedset name="testset" src="test.xml" request="true"/>
+
+    <class name="addText1">
+        <attribute name="after" type="expression"/>
+        <whenable/>
+        <handler name="onprebinding">
+            Debug.write(this, "prebinding", this['name']);
+        </handler>
+        
+        <handler name="onbinding">
+            Debug.write(this, "binding", this['name']);
+        </handler>
+        
+        <handler name="onfinished">
+            Debug.write(this, "finished", this['name']);
+        </handler>
+    </class>
+    
+    <class name="addText2">
+        <attribute name="after" type="expression"/>
+        <whenable/>
+        <handler name="onprebinding">
+            Debug.write(this, "prebinding", this['name']);
+        </handler>
+        
+        <handler name="onbinding">
+            Debug.write(this, "binding", this['name']);
+        </handler>
+        
+        <handler name="onfinished">
+            Debug.write(this, "finished", this['name']);
+        </handler>
+    </class>
+    
+    <class name="addText3">
+        <attribute name="after" type="expression"/>
+        <whenable/>
+        
+        <handler name="onprebinding">
+            Debug.write(this, "prebinding", this['name']);
+        </handler>
+        
+        <handler name="onbinding">
+            Debug.write(this, "binding", this['name']);
+        </handler>
+        
+        <handler name="onfinished">
+            Debug.write(this, "finished", this['name']);
+        </handler>
+    </class>
+    
+    <addText1 name="a1" after="${canvas.datasets.testset.finished}"/>
+    <addText2 name="a2" after="${canvas.a1.binding}"/>
+    <addText3 name="a3" after="${canvas.a2.finished}"/>
+</canvas>

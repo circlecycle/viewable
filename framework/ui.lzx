@@ -1,0 +1,769 @@
+<library>
+
+    <!-- makes a view with 100% size -->
+    <class name="fullview" width="100%" height="100%"/> 
+    
+    <!-- a convenience class equiv. to a view with a simplelayout on the horizontal axis -->
+    <class name="horiz">
+        <attribute name="spacing" type="number" value="0"/>
+        <simplelayout axis="x" spacing="${parent.spacing}"/>
+    </class>
+    
+    <!-- a convenience class equiv. to a view with a simplelayout on the vertical axis -->
+    <class name="vert">
+        <attribute name="spacing" type="number" value="0"/>
+        <simplelayout axis="y" spacing="${parent.spacing}"/>
+    </class>
+    
+    <!-- gives the parent a margin. not a trait since it can interfere with the baseclass -->
+    <class name="margin" x="${this.spacing}" y="${this.spacing}" clip="true"
+           width="${parent.width-(this.spacing*2)}" height="${parent.height-(this.spacing*2)}">
+        <attribute name="spacing" type="expression" value="0"/>
+    </class>
+    
+    <!-- field is like a normal edittext that has a default value
+         which persists until input is received -->
+    
+    <class name="field" extends="edittext" fgcolor="green">
+        <attribute name="label" type="string" value=" "/>
+        <attribute name="original_text" type="string"/>
+        <attribute name="altered" type="boolean"/>
+        <attribute name="success" type="boolean"/>
+        
+        <!-- when we are first made display our label -->
+        <handler name="oninit">
+            this.setAttribute('text', this.original_text);
+        </handler>
+        
+        <!-- when we get focus remove feedback -->
+        <handler name="onfocus">
+            Utils.tween(this.feedback, 'opacity', 0);
+            this.label_view.setAttribute('opacity', 0);
+        </handler>
+        
+        <!-- when success is true/false/null, reflect that state -->
+        <handler name="onsuccess">
+            if(this.success === true){
+                this.feedback.setAttribute('bgcolor', '0x00ff00');
+                this.feedback.setAttribute('opacity', 0.5);
+                Utils.tween(this.feedback, 'opacity', 0.1, 1000, {});
+            }
+                
+            else if(this.success === false){
+                this.feedback.setAttribute('bgcolor', '0xff0000');
+                this.feedback.setAttribute('opacity', 0.5);
+                Utils.tween(this.feedback, 'opacity', 0.2, 1000, {});
+            }
+            
+            else if(this.success === null){
+                Utils.tween(this.feedback, 'opacity', 0);
+            }
+        </handler>
+        
+        <!-- when we lose focus, if we have no input reset the field, else run the validation on the input -->
+        <handler name="onblur">
+            if(this['text'] == '')
+                this.label_view.setAttribute('opacity', 1);
+            else
+                this.setAttribute('success', this.validate(true));
+        </handler>
+        
+        <!-- when the text is explicitly set, capture it as our 'original_text' and calcuate whether we are altered from that -->
+        <handler name="ontext">
+            <![CDATA[   
+                if(this['text'] == '')
+                    this.label_view.setAttribute('opacity', 1);
+                else
+                    this.label_view.setAttribute('opacity', 0);
+                    
+                this.setAttribute('original_text', this['text']);
+                this.setAttribute('altered', false);
+            ]]>
+        </handler>
+        
+        <!-- calcuate whether we are altered from the stored 'original_text' -->
+        <handler name="onvalue">
+            <![CDATA[
+                this.setAttribute('altered', (this['text'] != this['original_text']));
+            ]]>
+        </handler>
+    
+        <!-- this resets the field to the original state -->
+        <method name="reset" args="ignore">
+            if(this['text'] == '')  this.setAttribute('text', this['label']);
+            else                    this.setAttribute('text', this['original_text']);
+                
+            Utils.tween(this.feedback, 'opacity', 0);
+        </method>
+        
+        <!-- override this to make your own validation evaluation -->
+        <method name="validate" args="ignore">
+            return null;
+        </method>
+        
+        <view name="feedback" x="0" y="0" width="${parent.width}" height="${parent.height}" bgcolor="green" opacity="0.0"/>
+        <text name="label_view" align="center" valign="middle" text="${parent.label}" fgcolor="0xcccccc" clickable="false"/>
+    </class>
+        
+    <!-- make a retangular view shadowed -->
+    <class name="shadowed" width="${parent.width}" height="${parent.height}" 
+            options="ignorelayout" clickable="false" pixellock="true"
+            opacity="1">
+        <attribute name="corner_size" type="number" value="16"/>
+        <!-- shadow on the top-right of the toolbar -->
+        <view resource="shadow_top_right"
+              x="${classroot.width}"/>
+        
+        <!-- shadow on the right side of the toolbar -->
+        <view resource="shadow_right" stretches="height" 
+              x="${classroot.width}" y="${classroot.corner_size}" height="${classroot.height-classroot.corner_size}"/>
+              
+        <!-- shadow on the corner of the toolbar -->
+        <view resource="shadow_bottom_right"
+              x="${classroot.width}" y="${classroot.height}"/>
+    
+        <!-- shadow on the bottom side of the toolbar -->
+        <view resource="shadow_bottom" stretches="width"
+               width="${classroot.width}" y="${classroot.height}"/>
+              
+        <!-- shadow on the top-right of the toolbar -->
+        <view resource="shadow_bottom_left"
+              x="${-classroot.corner_size}" y="${classroot.height}"/>
+              
+        <!-- shadow on the right side of the toolbar -->
+        <view resource="shadow_left" stretches="height" 
+              x="${-classroot.corner_size+3}" y="${classroot.corner_size}" height="${classroot.height-classroot.corner_size}"/>
+              
+        <!-- shadow on the top-right of the toolbar -->
+        <view resource="shadow_top_left"
+              x="${-classroot.corner_size}"/>
+              
+    </class>
+    
+    <!-- make a shadow across the upper part of a view only facing downwards. easier to layout then a real shadow hehe -->
+    <class name="upperShadow" width="${parent.width}" height="${parent.height}" options="ignorelayout" clickable="false">
+        <!-- shadow on the top-right of the toolbar -->
+        <view resource="shadow_bottom_left"/>
+        
+        <!-- shadow on the bottom side of the toolbar -->
+        <view resource="shadow_bottom" stretches="width"
+              x="16" width="${classroot.width-16}"/>
+    </class>
+    
+    <!-- a class to make a rounded box and hopefully, of a different color soon -->
+    <class name="basebox" clip="true" width="${parent.width}" height="${parent.height}" clickable="false">
+        <attribute name="border" type="number" value="10"/>
+        <attribute name="tl" type="string" value="roundbox_black_tl"/>
+        <attribute name="tr" type="string" value="roundbox_black_tr"/>
+        <attribute name="bl" type="string" value="roundbox_black_bl"/>
+        <attribute name="br" type="string" value="roundbox_black_br"/>
+        <attribute name="c"  type="string" value="roundbox_black_c"/>
+        
+        <!-- top left image -->
+        <view resource="${parent.tl}"/>
+        <!-- top right image -->
+        <view resource="${parent.tr}" x="${classroot.width-classroot.border}" y="0"/>
+        <!-- bottom left image -->
+        <view resource="${parent.bl}" x="0" y="${classroot.height-classroot.border}"/>
+        <!-- bottom right image -->
+        <view resource="${parent.br}" x="${classroot.width-classroot.border}" y="${classroot.height-classroot.border}"/>
+        
+        <!-- top image -->
+        <view resource="${parent.c}" clip="true" stretches="both" x="${classroot.border}" y="0" width="${classroot.width-(classroot.border*2)}" height="${classroot.border}"/>
+        <!-- bottom image -->        
+        <view resource="${parent.c}" clip="true" stretches="both" x="${classroot.border}" y="${classroot.height-classroot.border}" width="${classroot.width-(classroot.border*2)}" height="${classroot.border}"/>
+        <!-- right image -->        
+        <view resource="${parent.c}" clip="true" stretches="both" x="${classroot.width-classroot.border}" y="${classroot.border}" width="${classroot.border}" height="${classroot.height-(classroot.border*2)}"/>
+        <!-- left image -->         
+        <view resource="${parent.c}" clip="true" stretches="both" x="0" y="${classroot.border}" width="${classroot.border}" height="${classroot.height-(classroot.border*2)}"/>
+        
+        <!-- center image -->
+        <view resource="${parent.c}" clip="true" stretches="both" x="${classroot.border}" y="${classroot.border}" width="${classroot.width-(classroot.border*2)}" height="${classroot.height-(classroot.border*2)}"/>
+    </class>
+    
+    <class name="blackbox" extends="basebox">
+        <attribute name="border" type="number" value="10"/>
+        <attribute name="tl" type="string" value="roundbox_black_tl"/>
+        <attribute name="tr" type="string" value="roundbox_black_tr"/>
+        <attribute name="bl" type="string" value="roundbox_black_bl"/>
+        <attribute name="br" type="string" value="roundbox_black_br"/>
+        <attribute name="c"  type="string" value="roundbox_black_c"/>
+    </class>
+    
+    
+    <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+         various buttons - the dynamicSizedButton is a base class to make buttons of the general three sectioned (l/r/c) 
+         normal and over pieces that are stitched together.
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+    
+    <class name="dynamicSizedButton" height="${this.normal.left.resourceheight}" width="80">
+        <attribute name="label" type="string" value="No Label"/>
+        <attribute name="selected" type="boolean" value="false"/>
+        <attribute name="enabled" type="boolean" value="true"/>
+        <attribute name="skin" type="expression" value="$once{{}}"/>
+                          
+        <multiclickable/>
+        
+        <!-- skin the widget with the passed in set of resource names -->
+        <handler name="oninit">
+            this.applySkin(true);
+            //have to call this on update to ensure that user state is properly applied (sigh)
+            this.setAttribute('enabled', this['enabled']);
+        </handler>        
+        
+        <!-- choose the normal state -->
+        <handler name="onmousedown">
+            if(!this.isinited) return; //sigh
+            if(!this['enabled'] || this['selected'])
+                return;
+                
+            if(this.skin['dl'])
+                this.down.setAttribute('opacity', 1);
+        </handler>
+        
+        <handler name="onmouseup">
+            <![CDATA[
+            	if(!this.isinited) return; //sigh
+            	if(!this['enabled'] || this['selected'])
+                	return;
+                
+                if(this.skin['dl'])
+                    Utils.tween(this.down, 'opacity', 0);
+            ]]>
+        </handler>
+        
+        <!-- keep it in 'over' state when selected -->
+        <handler name="onselected">
+            <![CDATA[
+                if(!this.isinited) return; //sigh
+                    
+                if(this['selected'])
+                    Utils.tween(this['selectedimg'], 'opacity', 1, 200, {});
+                else
+                    Utils.tween(this['selectedimg'], 'opacity', 0, 300, {});
+            ]]>
+        </handler>
+        
+        <!-- if enabled == false grey out the button label (and unselect it)-->
+        <handler name="onenabled">
+            if(!this.isinited) return; //sigh
+            this.setAttribute('selected', false);
+            
+            if(this['enabled'] == true)
+                this.field.setAttribute('fgcolor', '0x000000');
+            else
+                this.field.setAttribute('fgcolor', '0x999999');
+        </handler>
+        
+        <!-- set the resources of this widget to the ones in specfied in the "skin" attribute dictionary. -->
+        <method name="applySkin" args="ignore">
+            this.normal.left.setAttribute('resource', this.skin['l']);
+            this.normal.right.setAttribute('resource', this.skin['r']);
+            this.normal.center.setAttribute('resource', this.skin['c']);
+            
+            if(this.skin['sl']){
+                this.selectedimg.left.setAttribute('resource', this.skin['sl']);
+                this.selectedimg.right.setAttribute('resource', this.skin['sr']);
+                this.selectedimg.center.setAttribute('resource', this.skin['sc']);
+            }
+            
+            if(this.skin['dl']){
+                this.down.left.setAttribute('resource', this.skin['dl']);
+                this.down.right.setAttribute('resource', this.skin['dr']);
+                this.down.center.setAttribute('resource', this.skin['dc']);
+            }
+            
+        </method>
+        
+        <!-- what the button looks like normally -->
+        <view name="normal" clickable="false">
+        	<horizontal/>
+            <view name="left"/>
+            <view name="center" stretches="width" width="${classroot.width-(parent.left.resourcewidth*2)}"/>
+            <view name="right"/>
+        </view>
+        
+        <!-- what the button looks like on mouseover -->
+        <view name="selectedimg" opacity="0" clickable="false">
+        	<horizontal/>
+            <view name="left"/>
+            <view name="center" stretches="width" width="${classroot.width-(parent.left.resourcewidth*2)}"/>
+            <view name="right"/>
+        </view>
+        
+        <!-- what the button looks like on mouseover -->
+        <view name="down" opacity="0" clickable="false">
+        	<horizontal/>
+            <view name="left"/>
+            <view name="center" stretches="width" width="${classroot.width-(parent.left.resourcewidth*2)}"/>
+            <view name="right"/>
+        </view>
+        
+        <!-- the label -->
+        <text fgcolor="black" name="field" resize="true" text="${classroot.label}" width="${Math.min(this.getTextWidth(), parent.width-32)}" align="center" valign="middle" multiline="true"/>
+    </class>
+    
+    <!-- just a better name for the default. -->
+    <class name="aquaButton" extends="dynamicSizedButton" 
+           skin="{r:'aquaButton_r', 
+                  l:'aquaButton_l', 
+                  c:'aquaButton_c', 
+                  sl:'aquaButton_hl',
+                  sr:'aquaButton_hr', 
+                  sc:'aquaButton_hc',
+                  dr:'aquaButton_dr',
+                  dc:'aquaButton_dc',
+                  dl:'aquaButton_dl'}"/>
+    
+    <!-- the aqua style "bar" button -->
+    <class name="aquaBarButton" extends="dynamicSizedButton"
+           skin="{r:'aquaBarButton_r', 
+                  l:'aquaBarButton_l', 
+                  c:'aquaBarButton_c', 
+                  sl:'aquaBarButton_hl',
+                  sr:'aquaBarButton_hr', 
+                  sc:'aquaBarButton_hc'}"/>
+                  
+    <!-- fadeline decorative only -->
+    <class name="fadeLine" extends="dynamicSizedButton" clickable="false" label=" " 
+           width="${parent.width}" height="1" opacity="0.3"
+           skin="{r:'fadeline_r', 
+                  l:'fadeline_l', 
+                  c:'fadeline_c', 
+                  sl:'fadeline_l',
+                  sr:'fadeline_r', 
+                  sc:'fadeline_c'}"/>
+                  
+    <!-- fadeline decorative only -->
+    <class name="selectionBox" extends="dynamicSizedButton" clickable="false" label=" "
+           skin="{r:'selectionbox_right', 
+                  l:'selectionbox_left', 
+                  c:'selectionbox_center', 
+                  sl:'selectionbox_left',
+                  sr:'selectionbox_right', 
+                  sc:'selectionbox_center'}"/> 
+                  
+
+    <!-- fadeline decorative only -->
+    <class name="undertab" extends="dynamicSizedButton" clickable="false" label=" "
+           skin="{r:'undertab_right', 
+                  l:'undertab_left', 
+                  c:'undertab_center', 
+                  sl:'undertab_left',
+                  sr:'undertab_right', 
+                  sc:'undertab_center'}"/>
+                  
+                  
+    <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+    various buttons - the dynamicSizedButton is a base class to make buttons of the general three sectioned (l/r/c) 
+    normal and over pieces that are stitched together.
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+
+    <class name="dynamicSizedPane">
+        <attribute name="selected" type="boolean" value="false"/>
+        <attribute name="enabled" type="boolean" value="true"/>
+        <attribute name="border" type="expression" value="${this.ul.resourcewidth}"/>
+        <attribute name="innercolor" type="color" value="0xdbdbdb"/>
+        <attribute name="skin" type="expression"
+                   value="{ul:'windowpane_ul',
+                           ur:'windowpane_ur',
+                           ll:'windowpane_ll',
+                           lr:'windowpane_lr', 
+                           t:'windowpane_t',
+                           r:'windowpane_r',
+                           b:'windowpane_b',
+                           l:'windowpane_l'}"/>
+    
+        <!-- skin the widget with the passed in set of resource names -->
+        <handler name="oninit">
+            this.applySkin(true);        
+        </handler>
+    
+        <!-- set the resources of this widget to the ones in specfied in the "skin" attribute dictionary. -->
+        <method name="applySkin" args="ignore">
+            this.ul.setAttribute('resource', this.skin['ul']);
+            this.ur.setAttribute('resource', this.skin['ur']);
+            this.ll.setAttribute('resource', this.skin['ll']);
+            this.lr.setAttribute('resource', this.skin['lr']);
+            
+            this.t.setAttribute('resource', this.skin['t']);
+            this.r.setAttribute('resource', this.skin['r']);
+            this.b.setAttribute('resource', this.skin['b']);
+            this.l.setAttribute('resource', this.skin['l']);
+        </method>
+        
+        <!-- the corners -->
+        <view name="ul" stretches="both" x="0" y="0" width="${classroot.border}" height="${classroot.border}"/>
+        <view name="ur" stretches="both" x="${classroot.width-classroot.border}" y="0" width="${classroot.border}" height="${classroot.border}"/>
+        <view name="ll" stretches="both" x="0" y="${classroot.height-classroot.border}" width="${classroot.border}" height="${classroot.border}"/>        
+        <view name="lr" stretches="both" x="${classroot.width-classroot.border}" y="${classroot.height-classroot.border}" width="${classroot.border}" height="${classroot.border}"/>
+
+        <!-- the sides -->
+        <view name="t" stretches="width" x="${classroot.border}" y="0" width="${classroot.width-(classroot.border*2)}"/>
+        <view name="r" stretches="height" x="${classroot.width-classroot.border}" y="${classroot.border}" height="${classroot.height-(classroot.border*2)}"/>
+        <view name="b" stretches="width" x="${classroot.border}" y="${classroot.height-classroot.border}" width="${classroot.width-(classroot.border*2)}"/>
+        <view name="l" stretches="height" x="0" y="${classroot.border}" height="${classroot.height-(classroot.border*2)}"/>
+        
+        <!-- the chewy center -->
+        <view name="c" clip="true" bgcolor="${classroot.innercolor}" x="${classroot.border}" y="${classroot.border}" width="${classroot.width-(classroot.border*2)}" height="${classroot.height-(classroot.border*2)}"/>
+    </class>
+       
+    <!-- a class that switches between a text field and an edittext field smoothly -->   
+    <class name="clickToEditField" with="openable" opened="false">
+        <attribute name="text" type="string" value="$once{''}"/>     
+        <attribute name="edited" type="boolean" value="false"/>
+        
+        <multiclickable/>
+        
+        <!-- open the field on click -->
+        <handler name="onsingleclick">
+            this.open(true);
+        </handler>
+        
+        <!-- when opened show the edittext field -->
+        <handler name="onopened">
+            //toggle visiblilty of the edit vs non-edit fields
+            this.display.setAttribute('visible', !this.opened);
+            this.field.setAttribute('visible', this.opened);
+            
+            if(this.opened){
+                //give ourselves focus so the text highlites, etc.
+                lz.Focus.setFocus(this.field);
+            }else{
+                //set the value of the edit field on the non-edit field if they are different.
+                //indicate item has been edited
+                if(this.field['text'] != this['text']){
+                    this.setAttribute('text', this.field['text']);
+                    this.setAttribute('edited', this);
+                }
+                
+                //lose focus
+                lz.Focus.clearFocus()
+            }
+        </handler>
+
+        <!-- this is our "normal" widget while not editing -->
+        <text name="display" visible="true" text="${parent.text}" align="${parent.align}" resize="true"/>
+        
+        <!-- this is our editing widget -->
+        <edittext name="field" visible="false" doesenter="true" align="${parent.align}" text="${classroot.text}" width="${classroot.width-20}">
+            
+            <!-- when they hit return commit the field -->
+            <handler name="onkeydown" args="key">
+                if(key == 13)
+                    classroot.close(true);
+            </handler>
+            
+            <!-- when they lose focus commit the field -->
+            <handler name="onblur">
+                classroot.close(true);
+            </handler>
+            
+        </edittext>
+        
+    </class>
+    
+    <class name="standardpane" extends="dynamicSizedPane"/>
+    
+    <!-- reveal is a neat one. when opened it automatically organizes all subviews into
+         a diagonal line showing as much of the title area as possible.
+         clicking on a view resets the positions bringing that view to the front. -->
+    <class name="reveal" extends="node" with="openable" opened="null">  
+        <attribute name="origxy" type="expression" value="[]"/>
+        <handler name="onopened">
+            <![CDATA[
+                if(this.opened){
+                    //how many non undefined subviews do we have?
+                    var numviews = parent.subviews.length;
+                    
+                    //get the xy ratio to draw a diagonal line of subviews:
+                    var maxx = parent.width-150;
+                    var maxy = parent.height-60;
+                    var stepx = Math.floor(maxx/numviews);
+                    var stepy = Math.floor(maxy/numviews);
+                    
+                    //create a table of xy locations to animate views toward
+                    var ret = [[0,0]];
+                    for(var i = 1 ; i < numviews ; i ++)
+                        ret.push([i*stepx, i*stepy]);
+                    
+                    this.origxy = [];
+                    for(var i = 0 ; i < parent.subviews.length ; i ++){ 
+                        this.origxy.push([parent.subviews[i].x, parent.subviews[i].y]);
+                        Utils.tween(parent.subviews[i], 'x', ret[i][0]);
+                        Utils.tween(parent.subviews[i], 'y', ret[i][1]);
+                    }
+                    
+                    //make a shade to compute logic on what should be revealed
+                    var shade = Utils.create('revealShade', parent, {revealer:this});
+                    lz.ModeManager.makeModal(shade);
+                }else if(this.opened === false){
+                    for(var i = 0 ; i < this.origxy.length ; i ++){ 
+                        Utils.tween(parent.subviews[i], 'x', origxy[i][0]);
+                        Utils.tween(parent.subviews[i], 'y', origxy[i][1]);
+                    }
+                    
+                    this.origxy = [];
+                    
+                    var shade = parent.subviews[parent.subviews.length-1];
+                    if(shade['selecteditem']){
+                        shade.selecteditem.setAttribute('selected', false);
+                        Utils.bringToFront(shade.selecteditem);
+                    }
+                    
+                    lz.ModeManager.release(shade);
+                    shade.destroy();
+                } 
+            ]]>
+        </handler>
+    </class>
+    
+    <!-- this class is made by the reveal class to cause parent.subviews to receive a selected message
+          and is managed - creation to destruction - by a state machine
+          in the reveal class. -->
+    <class name="revealShade" width="${parent.width}" height="${parent.height}">
+        <attribute name="revealer" type="expression"/>
+        <attribute name="selecteditem" type="expression" value="false"/>
+        
+        <handler name="onmousemove" reference="lz.GlobalMouse">
+            <![CDATA[
+                var views = parent.subviews;
+                var found = false;
+                for(var i = views.length-2 ; i >= 0 ; i --){
+                    if(Utils.isMouseOver(views[i]) && found == false){
+                        found = true;
+                        this.setAttribute('selecteditem', views[i]);
+                        views[i].setAttribute('selected', true);
+                    }
+                    else
+                        views[i].setAttribute('selected', false);
+                }
+            ]]>
+        </handler>
+        
+        <handler name="onmousedown">
+            this.revealer.close(true);
+        </handler>
+    </class>
+    
+    <!-- this is just a line spacer that can seperate entries -->
+    <class name="menuspacer" extends="fadeLine" width="${parent.width}" opacity="0.3"/>
+    
+    <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+         THE CHOOSEVIEWS COLLECTION
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+         
+    <!-- a class to toggle through inner child views -->
+    <class name="chooseview" width="${parent.width}" height="${parent.height}">
+        <attribute name="selectedindex" type="number" value="0"/>
+        <attribute name="chosen" type="expression" value="$once{this.subviews[0]}"/>
+        
+        <fireReadyEvent/>
+        
+        <handler name="onaddsubview">
+        	this.blankUnshown(true);
+		</handler>	
+    
+        <method name="blankUnshown" args="ignore">
+            <![CDATA[
+            	for(var i = 0 ; i < this.subviews.length ; i ++)
+                	if(i != this['selectedindex'])
+                    	this.subviews[i].setAttribute('opacity', 0);
+            ]]>	
+        </method>        
+    
+        <method name="choose" args="what">
+            //a chosen view is the *name* of the child view to toggle on. all others are
+            //toggled off.
+            if(!what || what == undefined) return;
+            var nowselected = Utils.indexOf(this.subviews, what);
+            for(var i in this.subviews){
+                var o = this.subviews[i];
+                if(i == nowselected)
+                    this.activationEffect(o);
+                else
+                    this.deactivationEffect(o);
+            }
+    
+            this.setAttribute('selectedindex', nowselected);
+            this.setAttribute('chosen', what);
+        </method>
+    
+        <method name="activationEffect" args="what">
+            what.setAttribute('opacity', 1);
+        </method>
+    
+        <method name="deactivationEffect" args="what">
+            what.setAttribute('opacity', 0);
+        </method>
+    
+    </class>
+    
+    <class name="slidechooseview" extends="chooseview" clip="true">
+        <attribute name="animationtime" type="number" value="${Utils.global_animation_time}"/>
+        <attribute name="axis" type="string" value="x"/>
+        <method name="activationEffect" args="viewtoshow">
+            <![CDATA[
+                //get the layer number of the two views to animate
+                var pos1 = this['selectedindex'];
+                var pos2 = Utils.getLayer(viewtoshow);
+    
+                //if it's selecting the same one, just return
+                if(pos1 == pos2)
+                    return;
+    
+                //get the currently visible view ("viewtoshow" has the view to show)
+                var selected = this.subviews[this['selectedindex']];
+    
+                //slide view-to-show left or right depending on the relative layer positioning.
+                //do this by setting the view to show
+                var viewtoshowmovesto = this.width;
+                var selectedmovesto = -1*this.width;
+                if(pos1 > pos2){
+                    var viewtoshowmovesto = viewtoshowmovesto * -1;
+                    var selectedmovesto = selectedmovesto * -1;
+                }
+    
+                viewtoshow.setAttribute(this['axis'], viewtoshowmovesto);
+                viewtoshow.setAttribute('opacity', 1);
+                Utils.tween(selected, this['axis'], selectedmovesto, this.animationtime);
+                Utils.tween(viewtoshow, this['axis'], 0, this.animationtime);
+    
+                //after the transition period blank the view no longer seen
+                this.lastselected = this['selectedindex'];
+                Utils.timer(this.animationtime, this, "blankUnshown");
+            ]]>
+        </method>
+    
+        <method name="deactivationEffect" args="viewtoshow">
+            return;
+        </method>
+    </class>
+    
+    <class name="fadechooseview" extends="chooseview" clip="true">
+        <attribute name="animationtime" type="number" value="${Utils.global_animation_time}"/>
+        <method name="activationEffect" args="viewtoshow">
+            Utils.tween(viewtoshow, 'opacity', 1, this['animationtime'])
+        </method>
+    
+        <method name="deactivationEffect" args="viewtoshow">
+            Utils.tween(viewtoshow, 'opacity', 0, this['animationtime'])
+        </method>
+    </class>
+    
+    <!-- GENERIC TABBED VIEWS! -->
+    <class name="tabbedViews" width="${parent.width}" height="${parent.height}" pixellock="true"> 
+    	<attribute name="tabs" type="expression" value="$once{[]}"/>
+        <attribute name="tabsalign" type="string" value="left"/>	
+        <attribute name="tabsheight" type="number" value="30"/>	
+        <attribute name="tab_width" type="number" value="100"/>	
+        <attribute name="can_close" type="boolean" value="true"/>	
+        <attribute name="skin" type="expression" 
+        		   value="{r:'tab_right', 
+                          l:'tab_left', 
+                          c:'tab_center', 
+                          sl:'tab_left',
+                          sr:'tab_right', 
+                          sc:'tab_center',
+                          dr:'tab_right',
+                          dc:'tab_center',
+                          dl:'tab_left',
+                          close:'close_icon'}"/>						
+        <waypoint/>
+        
+        <fireReadyEvent/>
+  
+        <handler name="onready">           	
+            <![CDATA[
+            	if(this['tabs'] == false) return;
+            
+            	for(var i = 0 ; i < this['tabs'].length ; i ++)               
+                	this.add(this['tabs'][i][0], this['tabs'][i][1]);
+            ]]>
+        </handler>
+        
+        <handler name="onwidth">
+           	//set the tab width, making sure it's even, when then whole width changes
+   	    	this.calcuateTabWidth(true);
+        </handler>	
+        
+        <method name="calcuateTabWidth" args="ignore">
+        	var tw = this.width/this._.tablist.parent.subviews.length;
+        	this.setAttribute('tab_width', tw);
+        </method>	
+        
+        <method name="add" args="tabname, tabclass">
+            var bind = Utils.makeBind('tab', {label:tabname, using:tabclass}, []);
+            this._.tablist.append(bind);
+            this._.panelist.append(bind);
+            this.calcuateTabWidth(true);
+        </method>
+				
+		<method name="remove" args="what">
+        	var i = Utils.getLayer(what);
+            
+            var tablist_item = this._.tablist.parent.subviews[i];
+            var panelist_item = this._.panelist.parent.subviews[i];
+            
+        	this._.tablist.remove(tablist_item);
+            this._.panelist.remove(panelist_item);
+            this.calcuateTabWidth(true);
+        </method>	
+                
+        <method name="getTabbedViewContainer" args="ignore">
+        	return this._.panelist.parent;
+        </method>
+        
+        <vertical/>
+        
+        <!-- tab bar -->
+        <view align="${classroot.tabsalign}" height="${classroot.tabsheight}" pixellock="true">
+            <horizontal/>
+            
+            <list using="tabhandle">
+            	<waypoint named="tablist"/>
+            </list>
+        </view>
+        
+        <!-- tab content area -->
+        <view clip="true" width="${parent.width}" height="${parent.height-this.y}">
+            <slidechooseview>
+                <list using="tabpane">
+                	<waypoint named="panelist"/>
+               	</list>
+            </slidechooseview>
+        </view>
+    </class>
+    
+    <!-- a single tab in a set of tabbed views -->
+    <class name="tabhandle" height="${parent.height}" width="${this._.parent.tab_width}" extends="dynamicSizedButton"
+    	   label="${this.bind.getNodeAttribute('label')}"
+           skin="${this._.parent.skin}">
+    	          
+    	<waypoint/>
+        
+        <handler name="oninit">
+        	Debug.write('new handle for tabbedviews made', this, this.down.center.resource);	
+        </handler>	
+        
+        <handler name="onsingleclick">
+            var container = this._.parent.getTabbedViewContainer(true);	
+            container.choose(container.subviews[this.dpi-1]);
+        </handler>
+        
+        <view resource="$once{classroot.skin['close']}" visible="${classroot._.parent.can_close}" x="${classroot.width-this.resourcewidth-4}" valign="middle">
+            <handler name="onmousedown">
+            	classroot._.parent.remove(classroot);
+            </handler>	
+        </view>
+
+    </class>
+    
+    <!-- a single pane in a set of tabbed views -->
+    <class name="tabpane" width="${parent.width}" height="${parent.height}" clip="true">
+        <handler name="onbinding">
+            Utils.create(this.bind.getNodeAttribute('using'), this, {});
+        </handler>
+    </class>
+    
+</library>

@@ -1,0 +1,14 @@
+<NotepadPlus>
+    <Session activeView="0">
+        <mainView activeIndex="2">
+            <File firstVisibleLine="0" xOffset="0" scrollWidth="963" startPos="0" endPos="0" selMode="0" lang="Normal Text" encoding="-1" filename="C:\Program Files\Apache Software Foundation\Apache2.2\conf\httpd.conf" />
+            <File firstVisibleLine="18" xOffset="0" scrollWidth="954" startPos="1199" endPos="1199" selMode="0" lang="Normal Text" encoding="-1" filename="C:\ol\Server\lps-4.6.1\viewablegroup\foundation\library.lzx" />
+            <File firstVisibleLine="92" xOffset="0" scrollWidth="944" startPos="727" endPos="733" selMode="0" lang="XML" encoding="-1" filename="C:\ol\Server\lps-4.6.1\viewablegroup\tests\replication.lzx" />
+            <File firstVisibleLine="344" xOffset="0" scrollWidth="1383" startPos="18122" endPos="18122" selMode="0" lang="XML" encoding="-1" filename="C:\ol\Server\lps-4.6.1\viewablegroup\framework\replicate.lzx" />
+            <File firstVisibleLine="85" xOffset="0" scrollWidth="636" startPos="4471" endPos="4471" selMode="0" lang="XML" encoding="-1" filename="C:\ol\Server\lps-4.6.1\viewablegroup\framework\layouts.lzx" />
+            <File firstVisibleLine="415" xOffset="0" scrollWidth="1033" startPos="22623" endPos="0" selMode="0" lang="XML" encoding="-1" filename="C:\ol\Server\lps-4.6.1\my-apps\sg3_common_lzx\replicate.lzx" />
+            <File firstVisibleLine="86" xOffset="0" scrollWidth="1006" startPos="7852" endPos="7745" selMode="0" lang="XML" encoding="-1" filename="C:\ol\Server\lps-4.6.1\viewablegroup\framework\replicate_after_some_unspecified_tinkering.lzx" />
+        </mainView>
+        <subView activeIndex="0" />
+    </Session>
+</NotepadPlus>

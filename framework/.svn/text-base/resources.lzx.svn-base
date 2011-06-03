@@ -1,0 +1,99 @@
+<library>
+    <!-- aqua scroll bar images -->
+    <resource name="aqua_scroll_upper" src="images/aqua_scroll_upper.png"/>
+    <resource name="aqua_scroll_middle" src="images/aqua_scroll_middle.png"/>
+    <resource name="aqua_scroll_lower" src="images/aqua_scroll_lower.png"/>
+    <resource name="aqua_scroll_solid" src="images/aqua_scroll_solid.png"/>
+    
+    <!-- the two cursors for insertion, vertical and horizontal -->
+    
+    <resource name="horizcursor" src="images/horizcursor.png"/>
+    <resource name="vertcursor" src="images/vertcursor.png"/>
+    
+    <!-- shadow -->
+    <resource name="shadow_top_right" src="images/shadow/shadow_top_right.png"/>
+    <resource name="shadow_right" src="images/shadow/shadow_right.png"/>
+    <resource name="shadow_bottom_right" src="images/shadow/shadow_bottom_right.png"/>
+    <resource name="shadow_bottom" src="images/shadow/shadow_bottom.png"/>
+    <resource name="shadow_bottom_left" src="images/shadow/shadow_bottom_left.png"/>
+    <resource name="shadow_top_left" src="images/shadow/shadow_top_left.png"/>
+    <resource name="shadow_left" src="images/shadow/shadow_left.png"/>
+    
+    
+    <resource name="drag_cursor" src="images/drag_cursor.png"/>
+    
+    <resource name="aquaBarButton_l"  src="images/aquaBarButton/l.png"/>
+    <resource name="aquaBarButton_c"  src="images/aquaBarButton/c.png"/>
+    <resource name="aquaBarButton_r"  src="images/aquaBarButton/r.png"/>
+    <resource name="aquaBarButton_hl" src="images/aquaBarButton/hl.png"/>
+    <resource name="aquaBarButton_hc" src="images/aquaBarButton/hc.png"/>
+    <resource name="aquaBarButton_hr" src="images/aquaBarButton/hr.png"/>
+    
+    <!-- aqua button resources -->
+    <resource name="aquaBarButton_l"  src="images/aquaBarButton/l.png"/>
+    <resource name="aquaBarButton_c"  src="images/aquaBarButton/c.png"/>
+    <resource name="aquaBarButton_r"  src="images/aquaBarButton/r.png"/>
+    <resource name="aquaBarButton_hl" src="images/aquaBarButton/hl.png"/>
+    <resource name="aquaBarButton_hc" src="images/aquaBarButton/hc.png"/>
+    <resource name="aquaBarButton_hr" src="images/aquaBarButton/hr.png"/>
+    
+    <!-- aqua bar button resources -->
+    <resource name="aquaButton_l"  src="images/aquaButton/l.png"/>
+    <resource name="aquaButton_c"  src="images/aquaButton/c.png"/>
+    <resource name="aquaButton_r"  src="images/aquaButton/r.png"/>
+    <resource name="aquaButton_hl" src="images/aquaButton/hl.png"/>
+    <resource name="aquaButton_hc" src="images/aquaButton/hc.png"/>
+    <resource name="aquaButton_hr" src="images/aquaButton/hr.png"/>
+    <resource name="aquaButton_dl" src="images/aquaButton/dl.png"/>
+    <resource name="aquaButton_dc" src="images/aquaButton/dc.png"/>
+    <resource name="aquaButton_dr" src="images/aquaButton/dr.png"/>
+    
+    <!-- the elegant fadeline -->
+    <resource name="fadeline_l" src="images/fadeline/fadeline_l.png"/>
+    <resource name="fadeline_c" src="images/fadeline/fadeline_c.png"/>
+    <resource name="fadeline_r" src="images/fadeline/fadeline_r.png"/>
+    
+    <!-- plus and minus buttons -->
+    <resource name="big_plus_icon" src="images/big_plus_icon.png"/>
+    <resource name="big_minus_icon" src="images/big_minus_icon.png"/>
+    
+    <!-- "undertab" button resources -->
+    <resource name="undertab_left"  src="images/tabs/undertab_left.png"/>
+    <resource name="undertab_center"  src="images/tabs/undertab_center.png"/>
+    <resource name="undertab_right"  src="images/tabs/undertab_right.png"/>
+    
+    <!-- windowpane basic -->
+    <resource name="windowpane_ul"  src="images/windowpane_embossed/ul.png"/>
+    <resource name="windowpane_ur"  src="images/windowpane_embossed/ur.png"/>
+    <resource name="windowpane_ll"  src="images/windowpane_embossed/ll.png"/>
+    <resource name="windowpane_lr"  src="images/windowpane_embossed/lr.png"/>
+    <resource name="windowpane_lrr" src="images/windowpane_embossed/lrr.png"/>
+    <resource name="windowpane_t"   src="images/windowpane_embossed/t.png"/>
+    <resource name="windowpane_r"   src="images/windowpane_embossed/r.png"/>
+    <resource name="windowpane_b"   src="images/windowpane_embossed/b.png"/>
+    <resource name="windowpane_l"   src="images/windowpane_embossed/l.png"/>
+    
+    <!-- windowpane osx -->
+    <resource name="windowpane_osx_ul"  src="images/windowpane_osx/ul.png"/>
+    <resource name="windowpane_osx_ur"  src="images/windowpane_osx/ur.png"/>
+    <resource name="windowpane_osx_uc"  src="images/windowpane_osx/uc.png"/>
+    <resource name="windowpane_osx_c"  src="images/windowpane_osx/c.png"/>
+    <resource name="windowpane_osx_lrr" src="images/windowpane_osx/lrr.png"/>
+    
+    <!-- item selections -->
+    <resource name="item_selection_over" src="images/item_selection_over.png"/>
+    <resource name="menubar_background" src="images/menubar_background.png"/>
+    
+    <!-- window icons -->
+    <resource name="close_icon" src="images/windowpane_osx/close_icon.png"/>
+    <resource name="maximize_icon" src="images/windowpane_osx/maximize_icon.png"/>
+    <resource name="hide_icon" src="images/windowpane_osx/hide_icon.png"/>
+    <resource name="maximize_on" src="images/windowpane_osx/maximize_on.png"/>
+
+    <!-- roundbox for overlay info messages -->
+    <resource name="roundbox_black_tr" src="images/roundbox/black/tr.png"/>
+    <resource name="roundbox_black_tl" src="images/roundbox/black/tl.png"/>
+    <resource name="roundbox_black_c" src="images/roundbox/black/c.png"/>
+    <resource name="roundbox_black_br" src="images/roundbox/black/br.png"/>
+    <resource name="roundbox_black_bl" src="images/roundbox/black/bl.png"/>
+</library>

@@ -1,0 +1,18 @@
+<!-- confine all application elements in an outer view so that any changes in z-depth
+         you make are local to your code.  -->
+    <fullview>
+        <!-- diagonal layout -->
+        <evenLayout axis="x" spacing="100" after="true"/>
+        <evenLayout axis="y" spacing="100" after="true"/>
+    
+        <!-- four windows to play with, initially -->
+        <windowpane using="standardBrowser" label="Browser at:" width="500" height="300"/>  
+        <windowpane using="standardBrowser" label="Browser at:" width="500" height="300"/>  
+        <windowpane using="standardBrowser" label="Browser at:" width="500" height="300"/>  
+        <windowpane using="standardBrowser" label="Browser at:" width="500" height="300"/>      
+    </fullview>
+    
+    <!-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
+         anything of global scope that must exist above all other layers is included here
+         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ -->
+    <view name="highlite" visible="false" width="20" height="20" bgcolor="blue" opacity="0.3" clickable="false"/>

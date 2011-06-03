@@ -1,0 +1,72 @@
+<library>
+
+    <!-- a class that advertises events to browse and process files -->
+    <class name="multiuploader" with="openable" opened="false">
+        <attribute name="frl" type="expression"/>
+        <attribute name="typename" type="string" value="Images"/>
+        <attribute name="typeextensions" type="string" value="*.jpg;*.gif;*.png"/>
+        <attribute name="files" type="expression"/>
+        
+        <!-- import the modues needed from the underlying flash environment -->
+        <!-- 
+            <passthrough>
+                import flash.net.FileReferenceList;
+                import flash.net.FileFilter
+                import flash.events.Event;
+                import flash.net.URLRequest;
+            </passthrough>
+        -->
+        
+        <!-- when we start, prepare our nescessary objects -->
+        <handler name="oninit" args="invoker">
+            <![CDATA[
+                //constrain the upload manager to the specified type name and extensions
+                this.calculateTypeObjects();
+                
+                //and create our filebrowser window singleton
+                this['frl'] = new FileReferenceList();
+                this['frl'].addEventListener(Event.SELECT, this.prepareFiles);
+            ]]>
+        </handler>
+        
+        <handler name="ontypeextensions">
+            this.calculateTypeObjects();
+        </handler>
+        
+        <handler name="ontypename">
+            this.calculateTypeObjects();
+        </handler>
+        
+        <!-- when the UploadManager is opened, show the browser window -->
+        <handler name="onopened">
+            <![CDATA[
+                if(!this['opened'] instanceof lz.node){
+                    Debug.error("When you open a uploadmanager you must provide a lister via the opened attribute");
+                    return;
+                }
+                    
+                //if this is opened, open the file browser
+                if(this['opened'] && this['frl'])
+                    this['frl'].browse(this['_typeobject']);
+            ]]>
+        </handler>
+        
+        <method name="calculateTypeObjects">
+            //create our file filter
+            var typeobject = new FileFilter(this['typename'], this['typeextensions']);
+            this['_typeobject'] = [typeobject];
+        </method>
+        
+        <!-- when a file object list is offered to this method, close
+             the UI and advertise to listenrs that we have new files to upload -->
+        <method name="prepareFiles" args="frl">
+            <![CDATA[
+                this.setAttribute('files', this['frl'].fileList);
+                this['opened'].setAttribute('files', this.files);
+                this.close(true);
+            ]]>
+        </method>
+        
+    </class>
+
+</library>
